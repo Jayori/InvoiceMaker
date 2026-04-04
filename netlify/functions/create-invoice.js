@@ -1,11 +1,11 @@
-const { Client, Environment } = require('square');
+const { SquareClient, SquareEnvironment } = require('square');
 const { Resend } = require('resend');
 const { createClient } = require('@supabase/supabase-js');
 const crypto = require('crypto');
 
-const square = new Client({
-  accessToken: process.env.SQUARE_ACCESS_TOKEN,
-  environment: process.env.SQUARE_ENVIRONMENT === 'production' ? Environment.Production : Environment.Sandbox,
+const square = new SquareClient({
+  token: process.env.SQUARE_ACCESS_TOKEN,
+  environment: process.env.SQUARE_ENVIRONMENT === 'production' ? SquareEnvironment.Production : SquareEnvironment.Sandbox,
 });
 const resend = new Resend(process.env.RESEND_API_KEY);
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
@@ -164,18 +164,18 @@ exports.handler = async (event) => {
     const lineItems = items.map(item => ({
       name: item.description.substring(0, 100),
       quantity: String(item.quantity),
-      basePriceMoney: { amount: BigInt(Math.round(item.unitPrice * 100)), currency: 'USD' },
+      basePriceMoney: { amount: Math.round(item.unitPrice * 100), currency: 'USD' },
     }));
     if (taxRate > 0) {
-      lineItems.push({ name: `Tax (${taxRate}%)`, quantity: '1', basePriceMoney: { amount: BigInt(Math.round(taxAmount * 100)), currency: 'USD' } });
+      lineItems.push({ name: `Tax (${taxRate}%)`, quantity: '1', basePriceMoney: { amount: Math.round(taxAmount * 100), currency: 'USD' } });
     }
-    const { result } = await square.checkoutApi.createPaymentLink({
+    const paymentLinkResult = await square.checkout.paymentLinks.create({
       idempotencyKey: crypto.randomUUID(),
       order: { locationId: process.env.SQUARE_LOCATION_ID, referenceId: invoiceNumber, lineItems },
       checkoutOptions: { redirectUrl: `${process.env.APP_URL}/client.html?paid=${passcode}` },
     });
-    squarePaymentLink = result.paymentLink.url;
-    squareOrderId = result.paymentLink.orderId;
+    squarePaymentLink = paymentLinkResult.paymentLink.url;
+    squareOrderId = paymentLinkResult.paymentLink.orderId;
   } catch (err) {
     console.error('Square error:', err);
     return { statusCode: 502, body: JSON.stringify({ error: 'Failed to create Square payment link', detail: err.message }) };

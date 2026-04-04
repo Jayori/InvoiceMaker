@@ -252,6 +252,9 @@ async function submitInvoice(e) {
   const payload = {
     clientName: document.getElementById('client-name').value.trim(),
     clientEmail: document.getElementById('client-email').value.trim(),
+    clientPhone: document.getElementById('client-phone').value.trim(),
+    clientCompany: document.getElementById('client-company').value.trim(),
+    clientAddress: document.getElementById('client-address').value.trim(),
     items,
     taxRate,
     notes: document.getElementById('notes').value.trim(),
@@ -263,7 +266,7 @@ async function submitInvoice(e) {
     fetch('/api/save-client', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: payload.clientName, email: payload.clientEmail }),
+      body: JSON.stringify({ name: payload.clientName, email: payload.clientEmail, phone: payload.clientPhone, company: payload.clientCompany, address: payload.clientAddress }),
     }).then(() => loadClients()).catch(() => {});
   }
 
@@ -298,6 +301,10 @@ function resetInvoiceForm() {
   itemId = 0;
   document.getElementById('tax-input-wrap').style.display = 'none';
   document.getElementById('tax-row').style.display = 'none';
+  ['client-name','client-email','client-phone','client-company','client-address','notes'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
   recalcTotals();
   addItem();
 }
@@ -351,6 +358,9 @@ function fillClient(id) {
   if (!c) return;
   document.getElementById('client-name').value = c.name || '';
   document.getElementById('client-email').value = c.email || '';
+  document.getElementById('client-phone').value = c.phone || '';
+  document.getElementById('client-company').value = c.company || '';
+  document.getElementById('client-address').value = c.address || '';
 }
 
 function showClientForm() {
