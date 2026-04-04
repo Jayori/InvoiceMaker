@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pay Invoice</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="client-body">
+
+  <div class="client-wrap">
+
+    <!-- Passcode entry -->
+    <div id="passcode-view" class="client-card">
+      <div class="client-biz-name" id="client-biz-name">Invoice Pro</div>
+      <h2 class="client-heading">Enter Your Invoice Passcode</h2>
+      <p class="client-sub">Your passcode was emailed to you when your invoice was sent.</p>
+
+      <form onsubmit="lookupInvoice(event)">
+        <input type="text" id="passcode-input" class="passcode-input"
+          placeholder="e.g. A3K9X2"
+          maxlength="6"
+          autocomplete="off"
+          autocapitalize="characters"
+          spellcheck="false"
+          required>
+        <button type="submit" class="btn btn-primary btn-block" id="lookup-btn">View My Invoice</button>
+      </form>
+
+      <div id="lookup-error" class="client-error" style="display:none;"></div>
+
+      <a href="index.html" class="client-back">← Back</a>
+    </div>
+
+    <!-- Invoice view -->
+    <div id="invoice-view" class="client-card" style="display:none;">
+      <div class="client-biz-name" id="invoice-biz-name">Invoice Pro</div>
+
+      <div class="inv-header">
+        <div>
+          <div class="inv-number" id="inv-number"></div>
+          <div class="inv-status" id="inv-status"></div>
+        </div>
+        <div class="inv-total-big" id="inv-total-big"></div>
+      </div>
+
+      <div class="inv-meta">
+        <div><span class="inv-label">Billed To</span><span class="inv-val" id="inv-client"></span></div>
+        <div><span class="inv-label">Due Date</span><span class="inv-val" id="inv-due"></span></div>
+      </div>
+
+      <table class="inv-items-table">
+        <thead>
+          <tr>
+            <th>Description</th>
+            <th style="text-align:center;">Qty</th>
+            <th style="text-align:right;">Rate</th>
+            <th style="text-align:right;">Total</th>
+          </tr>
+        </thead>
+        <tbody id="inv-items-tbody"></tbody>
+      </table>
+
+      <div class="inv-totals">
+        <div class="inv-totals-row"><span>Subtotal</span><span id="inv-subtotal"></span></div>
+        <div class="inv-totals-row" id="inv-tax-row" style="display:none;"><span id="inv-tax-label">Tax</span><span id="inv-tax-amount"></span></div>
+        <div class="inv-totals-row inv-totals-total"><span>Total Due</span><span id="inv-total"></span></div>
+      </div>
+
+      <div id="inv-notes-section" style="display:none;">
+        <div class="inv-label">Notes</div>
+        <div id="inv-notes" class="inv-notes-text"></div>
+      </div>
+
+      <div id="pay-section" style="margin-top:28px;text-align:center;">
+        <a id="pay-btn" href="#" class="btn btn-primary btn-block btn-pay" target="_blank">Pay Now</a>
+        <p style="margin:10px 0 0;font-size:13px;color:var(--gray-400);">Secure payment powered by Square</p>
+      </div>
+
+      <div id="paid-notice" class="paid-notice" style="display:none;">
+        Payment received — thank you!
+      </div>
+
+      <a href="client.html" class="client-back" style="margin-top:24px;display:block;">← Look up a different invoice</a>
+    </div>
+
+  </div>
+
+  <script src="client.js"></script>
+</body>
+</html>

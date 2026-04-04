@@ -3,150 +3,36 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Invoice Maker</title>
+  <title>Welcome</title>
   <link rel="stylesheet" href="style.css">
 </head>
-<body>
+<body class="landing-body">
 
-<header>
-  <div class="logo">InvoiceMaker</div>
-  <div style="display:flex;gap:10px;align-items:center;">
-    <button class="btn btn-secondary" id="back-btn" style="display:none;" onclick="showList()">
-      ← Back
-    </button>
-    <button class="btn btn-primary" id="new-invoice-btn" onclick="showCreate()">
-      + New Invoice
-    </button>
-  </div>
-</header>
+  <div class="landing-wrap">
+    <div class="landing-card">
+      <div class="landing-logo" id="landing-biz-name">Loading...</div>
+      <div class="landing-tagline" id="landing-tagline"></div>
 
-<main>
+      <a href="client.html" class="landing-btn">Pay Here</a>
 
-  <!-- Paid success banner (shows when ?paid=INV-xxx is in URL) -->
-  <div id="paid-banner">
-    Payment received — invoice marked as paid.
-  </div>
-
-  <!-- ─── Invoice List ─────────────────────────────── -->
-  <div id="list-view">
-    <div class="section-header">
-      <h1 class="section-title">Invoices</h1>
-      <span id="invoice-count" style="font-size:14px;color:var(--gray-500);"></span>
-    </div>
-
-    <div class="invoice-table-wrap">
-      <div id="list-loading" style="padding:40px;text-align:center;color:var(--gray-400);">Loading...</div>
-      <table class="invoice-table" id="invoice-table" style="display:none;">
-        <thead>
-          <tr>
-            <th>Client</th>
-            <th>Invoice #</th>
-            <th>Date</th>
-            <th>Due</th>
-            <th>Amount</th>
-            <th>Status</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody id="invoice-tbody"></tbody>
-      </table>
-      <div id="empty-state" class="empty-state" style="display:none;">
-        <svg width="48" height="48" fill="none" viewBox="0 0 24 24" stroke="currentColor" style="margin:0 auto;">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-        </svg>
-        <p>No invoices yet. Create your first one!</p>
-      </div>
+      <p class="landing-sub">Have an invoice? Click above to enter your passcode and pay securely.</p>
     </div>
   </div>
 
-  <!-- ─── Create Invoice ──────────────────────────── -->
-  <div id="create-view">
-    <div class="section-header">
-      <h1 class="section-title">New Invoice</h1>
-    </div>
+  <!-- Hidden manager access dot -->
+  <a href="manager.html" class="manager-dot" title="Manager access"></a>
 
-    <form id="invoice-form" onsubmit="submitInvoice(event)">
-
-      <!-- Client Info -->
-      <div class="card">
-        <div class="card-title">Client Information</div>
-        <div class="form-grid">
-          <div class="form-group">
-            <label for="client-name">Client Name *</label>
-            <input type="text" id="client-name" placeholder="John Smith" required>
-          </div>
-          <div class="form-group">
-            <label for="client-email">Client Email *</label>
-            <input type="email" id="client-email" placeholder="john@example.com" required>
-          </div>
-          <div class="form-group">
-            <label for="due-date">Due Date</label>
-            <input type="date" id="due-date">
-          </div>
-          <div class="form-group">
-            <label for="tax-rate">Tax Rate (%)</label>
-            <input type="number" id="tax-rate" value="0" min="0" max="100" step="0.1" oninput="recalcTotals()">
-          </div>
-          <div class="form-group full">
-            <label for="notes">Notes</label>
-            <textarea id="notes" placeholder="Payment terms, thank you message, etc."></textarea>
-          </div>
-        </div>
-      </div>
-
-      <!-- Line Items -->
-      <div class="card">
-        <div class="card-title">Line Items</div>
-        <div class="items-table-wrap">
-          <table class="items-table">
-            <thead>
-              <tr>
-                <th style="width:50%;">Description</th>
-                <th style="width:12%;">Qty</th>
-                <th style="width:18%;">Unit Price ($)</th>
-                <th style="width:12%;text-align:right;">Total</th>
-                <th style="width:8%;"></th>
-              </tr>
-            </thead>
-            <tbody id="items-tbody"></tbody>
-          </table>
-        </div>
-
-        <div class="add-item-row">
-          <button type="button" class="btn btn-secondary btn-sm" onclick="addItem()">+ Add Line Item</button>
-        </div>
-
-        <div class="totals-section">
-          <table class="totals-table">
-            <tr>
-              <td>Subtotal</td>
-              <td id="subtotal-display">$0.00</td>
-            </tr>
-            <tr id="tax-row" style="display:none;">
-              <td id="tax-label">Tax (0%)</td>
-              <td id="tax-display">$0.00</td>
-            </tr>
-            <tr class="total-row">
-              <td>Total Due</td>
-              <td id="total-display">$0.00</td>
-            </tr>
-          </table>
-        </div>
-      </div>
-
-      <div class="form-actions">
-        <button type="button" class="btn btn-secondary" onclick="showList()">Cancel</button>
-        <button type="submit" class="btn btn-primary" id="submit-btn">
-          Send Invoice & Payment Link
-        </button>
-      </div>
-    </form>
-  </div>
-
-</main>
-
-<div id="toast"></div>
-
-<script src="app.js"></script>
+  <script>
+    fetch('/api/get-business-profile')
+      .then(r => r.json())
+      .then(biz => {
+        document.getElementById('landing-biz-name').textContent = biz.name || 'Invoice Pro';
+        document.title = biz.name || 'Invoice Pro';
+        if (biz.tagline) document.getElementById('landing-tagline').textContent = biz.tagline;
+      })
+      .catch(() => {
+        document.getElementById('landing-biz-name').textContent = 'Invoice Pro';
+      });
+  </script>
 </body>
 </html>

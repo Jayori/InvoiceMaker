@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Manager — Invoice Pro</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="manager-body">
+
+  <!-- PIN Modal -->
+  <div id="pin-modal" class="pin-modal">
+    <div class="pin-card">
+      <div class="pin-logo" id="pin-biz-name">Invoice Pro</div>
+      <h2 class="pin-heading">Manager Access</h2>
+      <form onsubmit="verifyPin(event)">
+        <input type="password" id="pin-input" class="pin-input" placeholder="Enter PIN" maxlength="20" required autofocus>
+        <button type="submit" class="btn btn-primary btn-block" id="pin-btn">Enter</button>
+      </form>
+      <div id="pin-error" class="client-error" style="display:none;">Incorrect PIN. Try again.</div>
+      <a href="index.html" class="client-back">← Back to home</a>
+    </div>
+  </div>
+
+  <!-- Manager App (hidden until PIN verified) -->
+  <div id="manager-app" style="display:none;">
+
+    <div class="mgr-layout">
+
+      <!-- Sidebar -->
+      <aside class="mgr-sidebar">
+        <div class="mgr-brand" id="mgr-biz-name">Invoice Pro</div>
+        <nav class="mgr-nav">
+          <a href="#" class="mgr-nav-item active" onclick="showTab('dashboard',this)">
+            <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+            Dashboard
+          </a>
+          <a href="#" class="mgr-nav-item" onclick="showTab('new-invoice',this)">
+            <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+            New Invoice
+          </a>
+          <a href="#" class="mgr-nav-item" onclick="showTab('clients',this)">
+            <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+            Clients
+          </a>
+          <a href="#" class="mgr-nav-item" onclick="showTab('settings',this)">
+            <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+            Settings
+          </a>
+        </nav>
+        <a href="index.html" class="mgr-logout">← Home</a>
+      </aside>
+
+      <!-- Main content -->
+      <main class="mgr-main">
+
+        <!-- Dashboard -->
+        <div id="tab-dashboard" class="mgr-tab">
+          <div class="section-header">
+            <h1 class="section-title">Invoices</h1>
+            <div style="display:flex;gap:10px;align-items:center;">
+              <select id="status-filter" onchange="loadInvoices()" class="filter-select">
+                <option value="">All</option>
+                <option value="pending">Pending</option>
+                <option value="paid">Paid</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="invoice-table-wrap">
+            <div id="dash-loading" style="padding:40px;text-align:center;color:var(--gray-400);">Loading...</div>
+            <table class="invoice-table" id="invoice-table" style="display:none;">
+              <thead><tr>
+                <th>Client</th>
+                <th>Invoice #</th>
+                <th>Passcode</th>
+                <th>Date</th>
+                <th>Due</th>
+                <th>Amount</th>
+                <th>Status</th>
+                <th></th>
+              </tr></thead>
+              <tbody id="invoice-tbody"></tbody>
+            </table>
+            <div id="dash-empty" class="empty-state" style="display:none;">
+              <p>No invoices yet.</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- New Invoice -->
+        <div id="tab-new-invoice" class="mgr-tab" style="display:none;">
+          <div class="section-header">
+            <h1 class="section-title">New Invoice</h1>
+          </div>
+
+          <form id="invoice-form" onsubmit="submitInvoice(event)">
+
+            <!-- Client -->
+            <div class="card">
+              <div class="card-title">Client</div>
+              <div class="form-grid">
+                <div class="form-group full">
+                  <label for="client-select">Saved Clients</label>
+                  <select id="client-select" onchange="fillClient(this.value)">
+                    <option value="">— Select a saved client or fill in below —</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label for="client-name">Client Name *</label>
+                  <input type="text" id="client-name" placeholder="Jane Smith" required>
+                </div>
+                <div class="form-group">
+                  <label for="client-email">Client Email *</label>
+                  <input type="email" id="client-email" placeholder="jane@example.com" required>
+                </div>
+                <div class="form-group">
+                  <label for="due-date">Due Date</label>
+                  <input type="date" id="due-date">
+                </div>
+                <div class="form-group">
+                  <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+                    <input type="checkbox" id="save-client-check"> Save this client for future invoices
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            <!-- Line Items -->
+            <div class="card">
+              <div class="card-title">Line Items</div>
+              <div class="items-table-wrap">
+                <table class="items-table">
+                  <thead><tr>
+                    <th style="width:28%;">Type</th>
+                    <th style="width:30%;">Description</th>
+                    <th style="width:12%;" id="qty-header">Qty</th>
+                    <th style="width:15%;" id="rate-header">Rate ($)</th>
+                    <th style="width:10%;text-align:right;">Total</th>
+                    <th style="width:5%;"></th>
+                  </tr></thead>
+                  <tbody id="items-tbody"></tbody>
+                </table>
+              </div>
+              <div class="add-item-row">
+                <button type="button" class="btn btn-secondary btn-sm" onclick="addItem()">+ Add Line Item</button>
+              </div>
+
+              <!-- Tax -->
+              <div style="margin-top:16px;display:flex;align-items:center;gap:12px;">
+                <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px;">
+                  <input type="checkbox" id="tax-toggle" onchange="toggleTax()"> Add Tax
+                </label>
+                <div id="tax-input-wrap" style="display:none;display:flex;align-items:center;gap:6px;">
+                  <input type="number" id="tax-rate" value="8" min="0" max="100" step="0.1" oninput="recalcTotals()" style="width:70px;">
+                  <span style="font-size:14px;color:var(--gray-500);">%</span>
+                </div>
+              </div>
+
+              <div class="totals-section">
+                <table class="totals-table">
+                  <tr><td>Subtotal</td><td id="subtotal-display">$0.00</td></tr>
+                  <tr id="tax-row" style="display:none;"><td id="tax-label">Tax (8%)</td><td id="tax-display">$0.00</td></tr>
+                  <tr class="total-row"><td>Total Due</td><td id="total-display">$0.00</td></tr>
+                </table>
+              </div>
+            </div>
+
+            <!-- Notes -->
+            <div class="card">
+              <div class="card-title">Notes (optional)</div>
+              <textarea id="notes" placeholder="Payment terms, thank you message, special instructions..." style="width:100%;"></textarea>
+            </div>
+
+            <div class="form-actions">
+              <button type="button" class="btn btn-secondary" onclick="resetInvoiceForm()">Clear</button>
+              <button type="submit" class="btn btn-primary" id="submit-btn">Send Invoice & Payment Link</button>
+            </div>
+          </form>
+
+          <div id="invoice-success" class="invoice-success" style="display:none;">
+            <strong>Invoice sent!</strong> <span id="success-detail"></span>
+          </div>
+        </div>
+
+        <!-- Clients -->
+        <div id="tab-clients" class="mgr-tab" style="display:none;">
+          <div class="section-header">
+            <h1 class="section-title">Saved Clients</h1>
+            <button class="btn btn-primary" onclick="showClientForm()">+ Add Client</button>
+          </div>
+
+          <!-- Client form (hidden by default) -->
+          <div id="client-form-wrap" class="card" style="display:none;margin-bottom:20px;">
+            <div class="card-title" id="client-form-title">New Client</div>
+            <div class="form-grid">
+              <input type="hidden" id="edit-client-id">
+              <div class="form-group">
+                <label>Name *</label>
+                <input type="text" id="cf-name" placeholder="Jane Smith" required>
+              </div>
+              <div class="form-group">
+                <label>Email *</label>
+                <input type="email" id="cf-email" placeholder="jane@example.com" required>
+              </div>
+              <div class="form-group">
+                <label>Phone</label>
+                <input type="text" id="cf-phone" placeholder="(555) 000-0000">
+              </div>
+              <div class="form-group">
+                <label>Company</label>
+                <input type="text" id="cf-company" placeholder="Acme Inc.">
+              </div>
+              <div class="form-group full">
+                <label>Address</label>
+                <input type="text" id="cf-address" placeholder="123 Main St, City, State">
+              </div>
+              <div class="form-group full">
+                <label>Notes</label>
+                <textarea id="cf-notes" placeholder="Any notes about this client..."></textarea>
+              </div>
+            </div>
+            <div class="form-actions" style="margin-top:16px;">
+              <button type="button" class="btn btn-secondary" onclick="hideClientForm()">Cancel</button>
+              <button type="button" class="btn btn-primary" onclick="saveClient()">Save Client</button>
+            </div>
+          </div>
+
+          <div class="invoice-table-wrap">
+            <div id="clients-loading" style="padding:40px;text-align:center;color:var(--gray-400);">Loading...</div>
+            <table class="invoice-table" id="clients-table" style="display:none;">
+              <thead><tr>
+                <th>Name</th>
+                <th>Email</th>
+                <th>Phone</th>
+                <th>Company</th>
+                <th></th>
+              </tr></thead>
+              <tbody id="clients-tbody"></tbody>
+            </table>
+            <div id="clients-empty" class="empty-state" style="display:none;"><p>No saved clients yet.</p></div>
+          </div>
+        </div>
+
+        <!-- Settings -->
+        <div id="tab-settings" class="mgr-tab" style="display:none;">
+          <h1 class="section-title" style="margin-bottom:24px;">Business Profile</h1>
+
+          <div class="card">
+            <div class="card-title">Your Business Info</div>
+            <p style="font-size:13px;color:var(--gray-500);margin-bottom:20px;">This info appears on every invoice you send.</p>
+            <div class="form-grid">
+              <div class="form-group">
+                <label>Business Name *</label>
+                <input type="text" id="biz-name" placeholder="My Business LLC">
+              </div>
+              <div class="form-group">
+                <label>Tagline</label>
+                <input type="text" id="biz-tagline" placeholder="Quality work, every time">
+              </div>
+              <div class="form-group">
+                <label>Email</label>
+                <input type="email" id="biz-email" placeholder="hello@yourbusiness.com">
+              </div>
+              <div class="form-group">
+                <label>Phone</label>
+                <input type="text" id="biz-phone" placeholder="(555) 000-0000">
+              </div>
+              <div class="form-group full">
+                <label>Address</label>
+                <input type="text" id="biz-address" placeholder="123 Main St">
+              </div>
+              <div class="form-group">
+                <label>City</label>
+                <input type="text" id="biz-city" placeholder="New York">
+              </div>
+              <div class="form-group">
+                <label>State</label>
+                <input type="text" id="biz-state" placeholder="NY">
+              </div>
+              <div class="form-group">
+                <label>ZIP</label>
+                <input type="text" id="biz-zip" placeholder="10001">
+              </div>
+            </div>
+            <div class="form-actions" style="margin-top:20px;">
+              <button type="button" class="btn btn-primary" onclick="saveBusinessProfile()">Save Profile</button>
+            </div>
+            <div id="biz-saved-msg" style="display:none;margin-top:12px;color:var(--green);font-size:14px;font-weight:500;">Profile saved!</div>
+          </div>
+        </div>
+
+      </main>
+    </div>
+  </div>
+
+  <div id="toast"></div>
+  <script src="manager.js"></script>
+</body>
+</html>
