@@ -164,10 +164,10 @@ exports.handler = async (event) => {
     const lineItems = items.map(item => ({
       name: item.description.substring(0, 100),
       quantity: String(item.quantity),
-      basePriceMoney: { amount: Math.round(item.unitPrice * 100), currency: 'USD' },
+      basePriceMoney: { amount: BigInt(Math.round(item.unitPrice * 100)), currency: 'USD' },
     }));
     if (taxRate > 0) {
-      lineItems.push({ name: `Tax (${taxRate}%)`, quantity: '1', basePriceMoney: { amount: Math.round(taxAmount * 100), currency: 'USD' } });
+      lineItems.push({ name: `Tax (${taxRate}%)`, quantity: '1', basePriceMoney: { amount: BigInt(Math.round(taxAmount * 100)), currency: 'USD' } });
     }
     const paymentLinkResult = await square.checkout.paymentLinks.create({
       idempotencyKey: crypto.randomUUID(),
