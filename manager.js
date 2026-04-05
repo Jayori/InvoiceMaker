@@ -485,7 +485,10 @@ async function loadEstimates() {
         <td class="amount">$${Number(est.total).toFixed(2)}</td>
         <td><span class="badge badge-${statusColor}">${capitalize(est.status)}</span></td>
         <td id="msg-count-${est.id}"><span style="color:var(--gray-400);font-size:12px;">—</span></td>
-        <td><button class="btn btn-sm btn-secondary" onclick="openEstimateDetail('${est.id}')">View</button></td>
+        <td style="display:flex;gap:6px;">
+          <button class="btn btn-sm btn-secondary" onclick="openEstimateDetail('${est.id}')">View</button>
+          ${est.status === 'approved' ? `<button class="btn btn-sm btn-primary" onclick="openEstimateDetail('${est.id}')" title="Convert to invoice" style="background:#0f766e;">Invoice →</button>` : ''}
+        </td>
       </tr>`;
     }).join('');
     if (table) table.style.display = '';
@@ -541,6 +544,14 @@ async function openEstimateDetail(estimateId) {
     `;
 
     renderEstimateChat(est.messages || []);
+
+    // Show convert-to-invoice section for approved estimates
+    if (est.status === 'approved') {
+      showConvertToInvoice(est);
+    } else {
+      const section = document.getElementById('convert-invoice-section');
+      if (section) section.style.display = 'none';
+    }
   } catch {
     document.getElementById('est-chat-thread').innerHTML = '<div style="color:red;">Failed to load.</div>';
   }
@@ -565,6 +576,102 @@ function renderEstimateChat(messages) {
 function closeEstimateDetail() {
   document.getElementById('est-detail-panel').style.display = 'none';
   currentEstimateId = null;
+  currentEstimateData = null;
+}
+
+// ─── Convert estimate → invoice ────────────────────────────────────────────────
+
+let currentEstimateData = null;
+
+function showConvertToInvoice(estimate) {
+  currentEstimateData = estimate;
+  const section = document.getElementById('convert-invoice-section');
+  const list = document.getElementById('convert-items-list');
+  const successEl = document.getElementById('convert-success');
+  if (!section || !list) return;
+
+  successEl.style.display = 'none';
+  section.style.display = '';
+
+  list.innerHTML = (estimate.items || []).map((item, i) => `
+    <label style="display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border:1px solid var(--gray-200);border-radius:8px;margin-bottom:6px;cursor:pointer;">
+      <input type="checkbox" class="convert-item-check" data-index="${i}" data-cost="${item.cost || 0}"
+        onchange="recalcConvertTotal()" checked style="margin-top:3px;flex-shrink:0;">
+      <div style="flex:1;">
+        <div style="font-size:14px;font-weight:600;color:var(--gray-800);">${esc(item.description)}</div>
+        ${item.explanation ? `<div style="font-size:12px;color:var(--gray-500);margin-top:2px;">${esc(item.explanation)}</div>` : ''}
+      </div>
+      <div style="font-size:14px;font-weight:700;color:var(--gray-800);white-space:nowrap;">$${Number(item.cost || 0).toFixed(2)}</div>
+    </label>`).join('');
+
+  recalcConvertTotal();
+}
+
+function toggleConvertSection() {
+  const section = document.getElementById('convert-invoice-section');
+  if (section) section.style.display = section.style.display === 'none' ? '' : 'none';
+}
+
+function selectAllConvertItems(checked) {
+  document.querySelectorAll('.convert-item-check').forEach(cb => { cb.checked = checked; });
+  recalcConvertTotal();
+}
+
+function recalcConvertTotal() {
+  let total = 0;
+  document.querySelectorAll('.convert-item-check:checked').forEach(cb => {
+    total += parseFloat(cb.dataset.cost) || 0;
+  });
+  const totalEl = document.getElementById('convert-total');
+  if (totalEl) totalEl.textContent = `$${total.toFixed(2)}`;
+}
+
+async function submitConvertToInvoice() {
+  if (!currentEstimateData) return;
+
+  const selectedIndices = [];
+  document.querySelectorAll('.convert-item-check:checked').forEach(cb => {
+    selectedIndices.push(parseInt(cb.dataset.index));
+  });
+
+  if (!selectedIndices.length) { showToast('Select at least one item.', 'error'); return; }
+
+  const allItems = currentEstimateData.items || [];
+  const invoiceItems = selectedIndices.map(i => ({
+    type: allItems[i].type || 'item',
+    description: allItems[i].description,
+    quantity: 1,
+    unitPrice: Number(allItems[i].cost) || 0,
+  }));
+
+  const payload = {
+    clientName: currentEstimateData.client_name,
+    clientEmail: currentEstimateData.client_email,
+    items: invoiceItems,
+    taxRate: currentEstimateData.tax_rate || 0,
+    notes: `Converted from estimate ${currentEstimateData.estimate_number}`,
+  };
+
+  const btn = document.getElementById('convert-send-btn');
+  btn.disabled = true; btn.textContent = 'Sending...';
+
+  try {
+    const res = await fetch('/api/create-invoice', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(`${data.error || 'Failed'}${data.detail ? ': ' + data.detail : ''}`);
+
+    const successEl = document.getElementById('convert-success');
+    successEl.textContent = `Invoice ${data.invoice_number} sent to ${currentEstimateData.client_email}! Passcode: ${data.passcode}`;
+    successEl.style.display = '';
+    showToast('Invoice sent!', 'success');
+  } catch (err) {
+    showToast(err.message, 'error');
+  } finally {
+    btn.disabled = false; btn.textContent = 'Send Invoice';
+  }
 }
 
 async function sendEstimateReply() {

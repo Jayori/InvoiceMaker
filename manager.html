@@ -313,6 +313,26 @@
                 <textarea id="est-reply-input" placeholder="Type your reply..." style="flex:1;resize:vertical;min-height:60px;"></textarea>
                 <button class="btn btn-primary" onclick="sendEstimateReply()">Send Reply</button>
               </div>
+
+              <!-- Convert to Invoice (shown only for approved estimates) -->
+              <div id="convert-invoice-section" style="display:none;margin-top:24px;padding-top:20px;border-top:2px solid var(--gray-100);">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+                  <div class="card-title" style="margin:0;color:#0f766e;">Send as Invoice</div>
+                  <button class="btn btn-sm btn-secondary" onclick="toggleConvertSection()">Hide</button>
+                </div>
+                <p style="font-size:13px;color:var(--gray-500);margin:0 0 14px;">Select the items to include. You can send the full estimate or just the parts you've completed.</p>
+                <div id="convert-items-list" style="margin-bottom:14px;"></div>
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;padding:10px 12px;background:var(--gray-50);border-radius:8px;">
+                  <span style="font-size:14px;font-weight:600;">Invoice Total</span>
+                  <span style="font-size:18px;font-weight:800;color:#0f766e;" id="convert-total">$0.00</span>
+                </div>
+                <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                  <button class="btn btn-primary" onclick="submitConvertToInvoice()" id="convert-send-btn">Send Invoice</button>
+                  <button class="btn btn-secondary btn-sm" onclick="selectAllConvertItems(true)">Select All</button>
+                  <button class="btn btn-secondary btn-sm" onclick="selectAllConvertItems(false)">Deselect All</button>
+                </div>
+                <div id="convert-success" style="display:none;margin-top:12px;color:var(--green);font-size:14px;font-weight:500;"></div>
+              </div>
             </div>
           </div>
         </div>
