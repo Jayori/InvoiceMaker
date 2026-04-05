@@ -141,8 +141,8 @@ textarea { resize: vertical; min-height: 80px; }
 .landing-sub { margin-top: 24px; color: #93c5fd; font-size: 14px; line-height: 1.6; }
 
 .manager-dot {
-  position: fixed; bottom: 20px; right: 20px;
-  width: 10px; height: 10px; border-radius: 50%;
+  display: block; margin: 28px auto 0;
+  width: 12px; height: 12px; border-radius: 50%;
   background: rgba(255,255,255,0.15);
   transition: background 0.2s;
 }
