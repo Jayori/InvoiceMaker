@@ -280,7 +280,7 @@ async function submitInvoice(e) {
       body: JSON.stringify(payload),
     });
     const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Failed to create invoice');
+    if (!res.ok) throw new Error(`${data.error || 'Failed'}${data.detail ? ': ' + data.detail : ''}`);
 
     const successEl = document.getElementById('invoice-success');
     document.getElementById('success-detail').textContent =

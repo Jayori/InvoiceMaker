@@ -59,6 +59,7 @@ function showInvoice(inv, justPaid) {
   document.getElementById('passcode-view').style.display = 'none';
   const view = document.getElementById('invoice-view');
   view.style.display = '';
+  loadInvoiceHistory(inv.client_email, inv.id);
 
   document.getElementById('inv-number').textContent = inv.invoice_number;
 
@@ -111,6 +112,49 @@ function showInvoice(inv, justPaid) {
     document.getElementById('paid-notice').style.display = '';
   } else {
     document.getElementById('pay-btn').href = inv.square_payment_link || '#';
+  }
+}
+
+async function loadInvoiceHistory(email, currentId) {
+  const section = document.getElementById('history-section');
+  const loading = document.getElementById('history-loading');
+  const list = document.getElementById('history-list');
+  if (!section || !email) return;
+  section.style.display = '';
+
+  try {
+    const res = await fetch('/api/get-client-invoices', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
+    });
+    const invoices = await res.json();
+    loading.style.display = 'none';
+
+    if (!invoices.length) { section.style.display = 'none'; return; }
+
+    list.innerHTML = invoices.map(inv => {
+      const isCurrent = inv.id === currentId;
+      const statusClass = inv.status === 'paid' ? 'inv-status-paid' : 'inv-status-pending';
+      const statusLabel = inv.status === 'paid' ? 'Paid' : 'Unpaid';
+      const dateStr = inv.created_at
+        ? new Date(inv.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+        : '';
+      return `
+        <div class="history-item${isCurrent ? ' history-item-current' : ''}">
+          <div class="history-item-left">
+            <div class="history-inv-num">${esc(inv.invoice_number)}${isCurrent ? ' <span class="history-current-tag">Current</span>' : ''}</div>
+            <div class="history-inv-date">${dateStr}</div>
+          </div>
+          <div class="history-item-right">
+            <div class="history-inv-amount">$${Number(inv.total).toFixed(2)}</div>
+            <span class="inv-status-badge ${statusClass}">${statusLabel}</span>
+            ${inv.status !== 'paid' && inv.square_payment_link ? `<a href="${esc(inv.square_payment_link)}" target="_blank" class="btn btn-sm btn-primary" style="margin-top:4px;">Pay</a>` : ''}
+          </div>
+        </div>`;
+    }).join('');
+  } catch {
+    loading.textContent = 'Could not load history.';
   }
 }
 

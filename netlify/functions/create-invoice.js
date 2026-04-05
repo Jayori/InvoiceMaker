@@ -178,7 +178,8 @@ exports.handler = async (event) => {
     squareOrderId = paymentLinkResult.paymentLink.orderId;
   } catch (err) {
     console.error('Square error:', err);
-    return { statusCode: 502, body: JSON.stringify({ error: 'Failed to create Square payment link', detail: err.message }) };
+    const detail = err.errors ? JSON.stringify(err.errors) : (err.message || String(err));
+    return { statusCode: 502, body: JSON.stringify({ error: 'Square error', detail }) };
   }
 
   // Save to Supabase
