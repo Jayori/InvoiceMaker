@@ -23,7 +23,7 @@ exports.handler = async (event) => {
   let body;
   try { body = JSON.parse(event.body); } catch { return { statusCode: 400, body: JSON.stringify({ error: 'Invalid JSON' }) }; }
 
-  const { clientName, clientEmail, items, taxRate = 0, notes } = body;
+  const { clientName, clientEmail, clientPhone, clientCompany, clientAddress, items, taxRate = 0, notes } = body;
   if (!clientName || !clientEmail || !items?.length) {
     return { statusCode: 400, body: JSON.stringify({ error: 'clientName, clientEmail, and items required' }) };
   }
@@ -66,6 +66,9 @@ exports.handler = async (event) => {
       estimate_number: estimateNumber,
       client_name: clientName,
       client_email: normalizedEmail,
+      client_phone: clientPhone || null,
+      client_company: clientCompany || null,
+      client_address: clientAddress || null,
       items,
       subtotal,
       tax_rate: taxRate,

@@ -34,6 +34,7 @@ function initManager() {
   document.getElementById('manager-app').style.display = '';
   loadBusinessProfile();
   loadInvoices();
+  loadEstimates();
   loadClients();
   addItem();
   addEstimateItem();
@@ -59,9 +60,8 @@ function showTab(name, link) {
   document.querySelectorAll('.mgr-nav-item').forEach(a => a.classList.remove('active'));
   document.getElementById(`tab-${name}`).style.display = '';
   if (link) link.classList.add('active');
-  if (name === 'dashboard') loadInvoices();
+  if (name === 'dashboard') { loadInvoices(); loadEstimates(); }
   if (name === 'clients') loadClients();
-  if (name === 'estimates') loadEstimates();
   if (name === 'settings') loadBusinessProfile();
 }
 
@@ -141,7 +141,10 @@ async function loadInvoices() {
         <td>${inv.due_date ? formatDate(inv.due_date) : '—'}</td>
         <td class="amount">$${Number(inv.total).toFixed(2)}</td>
         <td><span class="badge badge-${inv.status}">${capitalize(inv.status)}</span></td>
-        <td>${inv.square_payment_link ? `<a href="${esc(inv.square_payment_link)}" target="_blank" class="btn btn-sm btn-secondary">Link</a>` : ''}</td>
+        <td style="display:flex;gap:6px;flex-wrap:wrap;">
+          ${inv.square_payment_link ? `<a href="${esc(inv.square_payment_link)}" target="_blank" class="btn btn-sm btn-secondary">Link</a>` : ''}
+          <button class="btn btn-sm btn-secondary" onclick="saveClientFromRow('${escAttr(inv.client_name)}','${escAttr(inv.client_email)}','${escAttr(inv.client_phone||'')}','${escAttr(inv.client_company||'')}','${escAttr(inv.client_address||'')}')" title="Save client to contacts">+ Client</button>
+        </td>
       </tr>`).join('');
     table.style.display = '';
   } catch { loading.textContent = 'Failed to load invoices.'; }
@@ -485,9 +488,10 @@ async function loadEstimates() {
         <td class="amount">$${Number(est.total).toFixed(2)}</td>
         <td><span class="badge badge-${statusColor}">${capitalize(est.status)}</span></td>
         <td id="msg-count-${est.id}"><span style="color:var(--gray-400);font-size:12px;">—</span></td>
-        <td style="display:flex;gap:6px;">
+        <td style="display:flex;gap:6px;flex-wrap:wrap;">
           <button class="btn btn-sm btn-secondary" onclick="openEstimateDetail('${est.id}')">View</button>
           ${est.status === 'approved' ? `<button class="btn btn-sm btn-primary" onclick="openEstimateDetail('${est.id}')" title="Convert to invoice" style="background:#0f766e;">Invoice →</button>` : ''}
+          <button class="btn btn-sm btn-secondary" onclick="saveClientFromRow('${escAttr(est.client_name)}','${escAttr(est.client_email)}','${escAttr(est.client_phone||'')}','${escAttr(est.client_company||'')}','${escAttr(est.client_address||'')}')" title="Save client to contacts">+ Client</button>
         </td>
       </tr>`;
     }).join('');
@@ -805,6 +809,24 @@ function fillEstimateClient(id) {
   if (!c) return;
   document.getElementById('est-client-name').value = c.name || '';
   document.getElementById('est-client-email').value = c.email || '';
+  document.getElementById('est-client-phone').value = c.phone || '';
+  document.getElementById('est-client-company').value = c.company || '';
+  document.getElementById('est-client-address').value = c.address || '';
+}
+
+async function saveClientFromRow(name, email, phone, company, address) {
+  if (!name || !email) { showToast('No client info to save.', 'error'); return; }
+  try {
+    // Upsert: check if client exists by email first
+    const res = await fetch('/api/save-client', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, email, phone: phone || '', company: company || '', address: address || '' }),
+    });
+    if (!res.ok) throw new Error('Failed');
+    await loadClients();
+    showToast(`${name} saved to Clients.`, 'success');
+  } catch { showToast('Failed to save client.', 'error'); }
 }
 
 async function submitEstimate(e) {
@@ -820,10 +842,21 @@ async function submitEstimate(e) {
   const payload = {
     clientName: document.getElementById('est-client-name').value.trim(),
     clientEmail: document.getElementById('est-client-email').value.trim(),
+    clientPhone: document.getElementById('est-client-phone').value.trim(),
+    clientCompany: document.getElementById('est-client-company').value.trim(),
+    clientAddress: document.getElementById('est-client-address').value.trim(),
     items,
     taxRate,
     notes: document.getElementById('est-notes').value.trim(),
   };
+
+  if (document.getElementById('est-save-client-check').checked) {
+    fetch('/api/save-client', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: payload.clientName, email: payload.clientEmail, phone: payload.clientPhone, company: payload.clientCompany, address: payload.clientAddress }),
+    }).then(() => loadClients()).catch(() => {});
+  }
 
   const btn = document.getElementById('est-submit-btn');
   btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Sending...';
@@ -856,6 +889,9 @@ function resetEstimateForm() {
   document.getElementById('est-tax-input-wrap').style.display = 'none';
   document.getElementById('est-tax-row').style.display = 'none';
   document.getElementById('est-completion-display').style.display = 'none';
+  ['est-client-name','est-client-email','est-client-phone','est-client-company','est-client-address','est-notes'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.value = '';
+  });
   recalcEstimateTotals();
   addEstimateItem();
 }

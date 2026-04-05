@@ -39,10 +39,6 @@
             <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
             New Invoice
           </a>
-          <a href="#" class="mgr-nav-item" onclick="showTab('estimates',this)">
-            <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/></svg>
-            Estimates
-          </a>
           <a href="#" class="mgr-nav-item" onclick="showTab('new-estimate',this)">
             <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
             New Estimate
@@ -65,7 +61,7 @@
         <!-- Dashboard -->
         <div id="tab-dashboard" class="mgr-tab">
           <div class="section-header">
-            <h1 class="section-title">Invoices</h1>
+            <h1 class="section-title">Dashboard</h1>
             <div style="display:flex;gap:10px;align-items:center;">
               <select id="status-filter" onchange="loadInvoices()" class="filter-select">
                 <option value="">All</option>
@@ -92,6 +88,71 @@
             </table>
             <div id="dash-empty" class="empty-state" style="display:none;">
               <p>No invoices yet.</p>
+            </div>
+          </div>
+
+          <!-- Estimates section in dashboard -->
+          <div style="margin-top:40px;">
+            <div class="section-header">
+              <h2 class="section-title" style="font-size:20px;">Estimates</h2>
+              <select id="est-status-filter" onchange="loadEstimates()" class="filter-select">
+                <option value="">All</option>
+                <option value="pending">Pending</option>
+                <option value="approved">Approved</option>
+                <option value="rejected">Rejected</option>
+              </select>
+            </div>
+            <div class="invoice-table-wrap">
+              <div id="est-loading" style="padding:40px;text-align:center;color:var(--gray-400);">Loading...</div>
+              <table class="invoice-table" id="est-table" style="display:none;">
+                <thead><tr>
+                  <th>Client</th>
+                  <th>Estimate #</th>
+                  <th>Date</th>
+                  <th>Completion</th>
+                  <th>Total</th>
+                  <th>Status</th>
+                  <th>Msgs</th>
+                  <th></th>
+                </tr></thead>
+                <tbody id="est-tbody"></tbody>
+              </table>
+              <div id="est-empty" class="empty-state" style="display:none;"><p>No estimates yet.</p></div>
+            </div>
+
+            <!-- Estimate detail panel -->
+            <div id="est-detail-panel" style="display:none;margin-top:24px;">
+              <div class="card">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+                  <div class="card-title" id="est-detail-title" style="margin:0;">Estimate</div>
+                  <button class="btn btn-sm btn-secondary" onclick="closeEstimateDetail()">✕ Close</button>
+                </div>
+                <div id="est-detail-info" style="margin-bottom:20px;font-size:14px;color:var(--gray-600);"></div>
+                <div class="card-title" style="font-size:13px;margin-bottom:12px;">Messages</div>
+                <div id="est-chat-thread" style="min-height:60px;margin-bottom:16px;"></div>
+                <div style="display:flex;gap:10px;align-items:flex-end;">
+                  <textarea id="est-reply-input" placeholder="Type your reply..." style="flex:1;resize:vertical;min-height:60px;"></textarea>
+                  <button class="btn btn-primary" onclick="sendEstimateReply()">Send Reply</button>
+                </div>
+                <div id="convert-invoice-section" style="display:none;margin-top:24px;padding-top:20px;border-top:2px solid var(--gray-100);">
+                  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+                    <div class="card-title" style="margin:0;color:#0f766e;">Send as Invoice</div>
+                    <button class="btn btn-sm btn-secondary" onclick="toggleConvertSection()">Hide</button>
+                  </div>
+                  <p style="font-size:13px;color:var(--gray-500);margin:0 0 14px;">Select the items to include. You can send the full estimate or just the parts you've completed.</p>
+                  <div id="convert-items-list" style="margin-bottom:14px;"></div>
+                  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;padding:10px 12px;background:var(--gray-50);border-radius:8px;">
+                    <span style="font-size:14px;font-weight:600;">Invoice Total</span>
+                    <span style="font-size:18px;font-weight:800;color:#0f766e;" id="convert-total">$0.00</span>
+                  </div>
+                  <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                    <button class="btn btn-primary" onclick="submitConvertToInvoice()" id="convert-send-btn">Send Invoice</button>
+                    <button class="btn btn-secondary btn-sm" onclick="selectAllConvertItems(true)">Select All</button>
+                    <button class="btn btn-secondary btn-sm" onclick="selectAllConvertItems(false)">Deselect All</button>
+                  </div>
+                  <div id="convert-success" style="display:none;margin-top:12px;color:var(--green);font-size:14px;font-weight:500;"></div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -263,80 +324,6 @@
           </div>
         </div>
 
-        <!-- Estimates list -->
-        <div id="tab-estimates" class="mgr-tab" style="display:none;">
-          <div class="section-header">
-            <h1 class="section-title">Estimates</h1>
-            <div style="display:flex;gap:10px;align-items:center;">
-              <select id="est-status-filter" onchange="loadEstimates()" class="filter-select">
-                <option value="">All</option>
-                <option value="pending">Pending</option>
-                <option value="approved">Approved</option>
-                <option value="rejected">Rejected</option>
-              </select>
-            </div>
-          </div>
-
-          <div class="invoice-table-wrap">
-            <div id="est-loading" style="padding:40px;text-align:center;color:var(--gray-400);">Loading...</div>
-            <table class="invoice-table" id="est-table" style="display:none;">
-              <thead><tr>
-                <th>Client</th>
-                <th>Estimate #</th>
-                <th>Date</th>
-                <th>Completion</th>
-                <th>Total</th>
-                <th>Status</th>
-                <th>Msgs</th>
-                <th></th>
-              </tr></thead>
-              <tbody id="est-tbody"></tbody>
-            </table>
-            <div id="est-empty" class="empty-state" style="display:none;"><p>No estimates yet.</p></div>
-          </div>
-
-          <!-- Estimate detail panel -->
-          <div id="est-detail-panel" style="display:none;margin-top:24px;">
-            <div class="card">
-              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
-                <div class="card-title" id="est-detail-title" style="margin:0;">Estimate</div>
-                <button class="btn btn-sm btn-secondary" onclick="closeEstimateDetail()">✕ Close</button>
-              </div>
-              <div id="est-detail-info" style="margin-bottom:20px;font-size:14px;color:var(--gray-600);"></div>
-
-              <!-- Chat thread -->
-              <div class="card-title" style="font-size:13px;margin-bottom:12px;">Messages</div>
-              <div id="est-chat-thread" style="min-height:60px;margin-bottom:16px;"></div>
-
-              <!-- Reply form -->
-              <div style="display:flex;gap:10px;align-items:flex-end;">
-                <textarea id="est-reply-input" placeholder="Type your reply..." style="flex:1;resize:vertical;min-height:60px;"></textarea>
-                <button class="btn btn-primary" onclick="sendEstimateReply()">Send Reply</button>
-              </div>
-
-              <!-- Convert to Invoice (shown only for approved estimates) -->
-              <div id="convert-invoice-section" style="display:none;margin-top:24px;padding-top:20px;border-top:2px solid var(--gray-100);">
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
-                  <div class="card-title" style="margin:0;color:#0f766e;">Send as Invoice</div>
-                  <button class="btn btn-sm btn-secondary" onclick="toggleConvertSection()">Hide</button>
-                </div>
-                <p style="font-size:13px;color:var(--gray-500);margin:0 0 14px;">Select the items to include. You can send the full estimate or just the parts you've completed.</p>
-                <div id="convert-items-list" style="margin-bottom:14px;"></div>
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;padding:10px 12px;background:var(--gray-50);border-radius:8px;">
-                  <span style="font-size:14px;font-weight:600;">Invoice Total</span>
-                  <span style="font-size:18px;font-weight:800;color:#0f766e;" id="convert-total">$0.00</span>
-                </div>
-                <div style="display:flex;gap:8px;flex-wrap:wrap;">
-                  <button class="btn btn-primary" onclick="submitConvertToInvoice()" id="convert-send-btn">Send Invoice</button>
-                  <button class="btn btn-secondary btn-sm" onclick="selectAllConvertItems(true)">Select All</button>
-                  <button class="btn btn-secondary btn-sm" onclick="selectAllConvertItems(false)">Deselect All</button>
-                </div>
-                <div id="convert-success" style="display:none;margin-top:12px;color:var(--green);font-size:14px;font-weight:500;"></div>
-              </div>
-            </div>
-          </div>
-        </div>
-
         <!-- New Estimate -->
         <div id="tab-new-estimate" class="mgr-tab" style="display:none;">
           <div class="section-header">
@@ -361,6 +348,23 @@
                 <div class="form-group">
                   <label>Client Email *</label>
                   <input type="email" id="est-client-email" placeholder="jane@example.com" required>
+                </div>
+                <div class="form-group">
+                  <label>Client Phone</label>
+                  <input type="text" id="est-client-phone" placeholder="(555) 000-0000">
+                </div>
+                <div class="form-group">
+                  <label>Company</label>
+                  <input type="text" id="est-client-company" placeholder="Acme Inc.">
+                </div>
+                <div class="form-group full">
+                  <label>Client Address</label>
+                  <input type="text" id="est-client-address" placeholder="123 Main St, City, State ZIP">
+                </div>
+                <div class="form-group full">
+                  <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+                    <input type="checkbox" id="est-save-client-check"> Save this client for future estimates &amp; invoices
+                  </label>
                 </div>
               </div>
             </div>
