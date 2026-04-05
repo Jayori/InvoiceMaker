@@ -48,7 +48,7 @@ async function loadInvoice(code, justPaid) {
     }
 
     if (data.mode === 'profile') {
-      showProfile(data.client, data.invoices, justPaid);
+      showProfile(data.client, data.invoices, justPaid, code);
     } else {
       // Legacy fallback: old per-invoice passcode
       showInvoice(data, justPaid);
@@ -61,32 +61,34 @@ async function loadInvoice(code, justPaid) {
   }
 }
 
-// ── Profile mode (new) ────────────────────────────────────────────────────────
+// ── Profile mode ─────────────────────────────────────────────────────────────
 
-function showProfile(client, invoices, justPaid) {
+let clientPasscode = '';
+
+function showProfile(client, invoices, justPaid, passcode) {
+  clientPasscode = passcode || '';
   document.getElementById('passcode-view').style.display = 'none';
   document.getElementById('invoice-view').style.display = '';
 
-  // Greeting
   const greetEl = document.getElementById('inv-client-greeting');
   if (greetEl) { greetEl.textContent = `Hello, ${client.name}`; greetEl.style.display = ''; }
 
-  // Feature the first unpaid invoice, or most recent if all paid
   const pending = invoices.filter(i => i.status !== 'paid');
   const featured = pending[0] || invoices[0];
 
   if (featured) {
     renderInvoiceDetails(featured, justPaid);
   } else {
-    // No invoices yet — hide invoice details area
     document.getElementById('inv-header').style.display = 'none';
     document.getElementById('inv-meta').style.display = 'none';
-    document.querySelector('.inv-items-table').style.display = 'none';
+    const tbl = document.querySelector('.inv-items-table');
+    if (tbl) tbl.style.display = 'none';
     document.getElementById('inv-totals').style.display = 'none';
     document.getElementById('pay-section').style.display = 'none';
   }
 
   showHistoryFromList(invoices, featured?.id);
+  renderEstimates(client.estimates || []);
 }
 
 // ── Invoice detail rendering ──────────────────────────────────────────────────
@@ -221,6 +223,164 @@ async function loadInvoiceHistory(email, currentId) {
   } catch {
     if (loading) loading.textContent = 'Could not load history.';
   }
+}
+
+// ── Estimates ─────────────────────────────────────────────────────────────────
+
+function renderEstimates(estimates) {
+  const section = document.getElementById('estimates-section');
+  const list = document.getElementById('estimates-list');
+  if (!section || !estimates.length) { if (section) section.style.display = 'none'; return; }
+
+  section.style.display = '';
+  list.innerHTML = estimates.map(est => {
+    const completion = est.estimated_completion_date
+      ? new Date(est.estimated_completion_date + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })
+      : null;
+    const statusClass = est.status === 'approved' ? 'est-status-approved' : est.status === 'rejected' ? 'est-status-rejected' : 'est-status-pending';
+    const statusLabel = est.status === 'approved' ? 'Approved' : est.status === 'rejected' ? 'Declined' : 'Awaiting Your Response';
+    const isPending = est.status === 'pending';
+    const dateStr = est.created_at ? new Date(est.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '';
+
+    const itemRows = (est.items || []).map(item => `
+      <div class="est-item-row">
+        <div class="est-item-info">
+          <div class="est-item-desc">${esc(item.description)}</div>
+          ${item.explanation ? `<div class="est-item-expl">${esc(item.explanation)}</div>` : ''}
+          ${item.estimatedDays ? `<div class="est-item-days">Est. ${item.estimatedDays} day${Number(item.estimatedDays) !== 1 ? 's' : ''}</div>` : ''}
+        </div>
+        <div class="est-item-cost">$${Number(item.cost).toFixed(2)}</div>
+      </div>`).join('');
+
+    const messages = est.messages || [];
+    const chatHtml = messages.length ? `
+      <div class="est-chat-section">
+        <div class="est-chat-title">Messages</div>
+        ${messages.map(m => `
+          <div class="chat-bubble ${m.sender === 'client' ? 'chat-bubble-client' : 'chat-bubble-manager'}">
+            <div class="chat-bubble-meta">${m.sender === 'client' ? 'You' : 'Business'} · ${new Date(m.created_at).toLocaleString('en-US', { month:'short', day:'numeric', hour:'numeric', minute:'2-digit' })}</div>
+            <div class="chat-bubble-text">${esc(m.message)}</div>
+          </div>`).join('')}
+      </div>` : '';
+
+    const msgFormHtml = isPending ? `
+      <div class="est-msg-form" id="msg-form-${est.id}" style="display:none;">
+        <textarea id="msg-input-${est.id}" placeholder="Type your question..." style="width:100%;min-height:70px;resize:vertical;margin-bottom:8px;"></textarea>
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-primary btn-sm" onclick="sendEstimateQuestion('${est.id}')">Send Question</button>
+          <button class="btn btn-secondary btn-sm" onclick="toggleMsgForm('${est.id}')">Cancel</button>
+        </div>
+      </div>` : '';
+
+    return `
+      <div class="est-card" id="est-card-${est.id}">
+        <div class="est-card-header">
+          <div>
+            <div class="est-num">${esc(est.estimate_number)}</div>
+            <div class="est-date">${dateStr}</div>
+          </div>
+          <span class="est-status-badge ${statusClass}">${statusLabel}</span>
+        </div>
+
+        <div class="est-items">${itemRows}</div>
+
+        ${est.tax_rate > 0 ? `<div class="est-subtotal-row"><span>Subtotal</span><span>$${Number(est.subtotal).toFixed(2)}</span></div>
+        <div class="est-subtotal-row"><span>Tax (${est.tax_rate}%)</span><span>$${Number(est.tax_amount).toFixed(2)}</span></div>` : ''}
+
+        <div class="est-big-row">
+          <div class="est-big-block">
+            <div class="est-big-label">Total Estimate</div>
+            <div class="est-big-value est-big-total">$${Number(est.total).toFixed(2)}</div>
+          </div>
+          ${completion ? `<div class="est-big-block est-big-right">
+            <div class="est-big-label">Estimated Completion</div>
+            <div class="est-big-value est-big-date">${completion}</div>
+          </div>` : ''}
+        </div>
+
+        ${est.notes ? `<div class="est-notes">${esc(est.notes)}</div>` : ''}
+
+        ${isPending ? `
+        <div class="est-actions">
+          <button class="btn est-btn-approve" onclick="estimateAction('${est.id}', 'approve')">✓ Approve</button>
+          <button class="btn est-btn-reject" onclick="estimateAction('${est.id}', 'reject')">✗ Decline</button>
+          <button class="btn est-btn-question" onclick="toggleMsgForm('${est.id}')">? Ask a Question</button>
+        </div>` : ''}
+
+        ${chatHtml}
+        ${msgFormHtml}
+      </div>`;
+  }).join('');
+}
+
+function toggleMsgForm(estimateId) {
+  const form = document.getElementById(`msg-form-${estimateId}`);
+  if (form) form.style.display = form.style.display === 'none' ? '' : 'none';
+}
+
+async function estimateAction(estimateId, action) {
+  const card = document.getElementById(`est-card-${estimateId}`);
+  const word = action === 'approve' ? 'approve' : 'decline';
+  if (!confirm(`Are you sure you want to ${word} this estimate?`)) return;
+
+  try {
+    const res = await fetch('/api/estimate-action', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ estimateId, passcode: clientPasscode, action }),
+    });
+    const data = await res.json();
+    if (!res.ok) { alert(data.error || 'Failed'); return; }
+
+    // Update status badge and remove action buttons
+    if (card) {
+      const badge = card.querySelector('.est-status-badge');
+      if (badge) {
+        if (action === 'approve') { badge.textContent = 'Approved'; badge.className = 'est-status-badge est-status-approved'; }
+        else { badge.textContent = 'Declined'; badge.className = 'est-status-badge est-status-rejected'; }
+      }
+      const actions = card.querySelector('.est-actions');
+      if (actions) actions.remove();
+      const msgForm = card.querySelector('.est-msg-form');
+      if (msgForm) msgForm.remove();
+    }
+  } catch { alert('Something went wrong. Please try again.'); }
+}
+
+async function sendEstimateQuestion(estimateId) {
+  const input = document.getElementById(`msg-input-${estimateId}`);
+  const message = input?.value.trim();
+  if (!message) return;
+
+  const btn = document.querySelector(`#msg-form-${estimateId} .btn-primary`);
+  if (btn) { btn.disabled = true; btn.textContent = 'Sending...'; }
+
+  try {
+    const res = await fetch('/api/estimate-action', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ estimateId, passcode: clientPasscode, action: 'message', message }),
+    });
+    const data = await res.json();
+    if (!res.ok) { alert(data.error || 'Failed to send'); return; }
+
+    // Append message to chat
+    const card = document.getElementById(`est-card-${estimateId}`);
+    let chatSection = card?.querySelector('.est-chat-section');
+    if (!chatSection) {
+      const msgForm = document.getElementById(`msg-form-${estimateId}`);
+      chatSection = document.createElement('div');
+      chatSection.className = 'est-chat-section';
+      chatSection.innerHTML = '<div class="est-chat-title">Messages</div>';
+      card.insertBefore(chatSection, msgForm);
+    }
+    const time = new Date().toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+    const bubble = document.createElement('div');
+    bubble.className = 'chat-bubble chat-bubble-client';
+    bubble.innerHTML = `<div class="chat-bubble-meta">You · ${time}</div><div class="chat-bubble-text">${esc(message)}</div>`;
+    chatSection.appendChild(bubble);
+    input.value = '';
+    document.getElementById(`msg-form-${estimateId}`).style.display = 'none';
+  } catch { alert('Something went wrong.'); }
+  finally { if (btn) { btn.disabled = false; btn.textContent = 'Send Question'; } }
 }
 
 function esc(str) {

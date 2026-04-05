@@ -16,16 +16,29 @@ exports.handler = async (event) => {
     .maybeSingle();
 
   if (client) {
-    const { data: invoices } = await supabase
-      .from('invoices')
-      .select('*')
-      .eq('client_email', client.email)
-      .order('created_at', { ascending: false });
+    const [invoicesResult, estimatesResult] = await Promise.all([
+      supabase.from('invoices').select('*').eq('client_email', client.email).order('created_at', { ascending: false }),
+      supabase.from('estimates').select('*').eq('client_email', client.email).order('created_at', { ascending: false }),
+    ]);
+
+    const estimates = estimatesResult.data || [];
+    let estimatesWithMessages = estimates;
+    if (estimates.length > 0) {
+      const { data: allMessages } = await supabase
+        .from('estimate_messages')
+        .select('*')
+        .in('estimate_id', estimates.map(e => e.id))
+        .order('created_at');
+      estimatesWithMessages = estimates.map(est => ({
+        ...est,
+        messages: (allMessages || []).filter(m => m.estimate_id === est.id),
+      }));
+    }
 
     return {
       statusCode: 200,
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ mode: 'profile', client, invoices: invoices || [] }),
+      body: JSON.stringify({ mode: 'profile', client, invoices: invoicesResult.data || [], estimates: estimatesWithMessages }),
     };
   }
 

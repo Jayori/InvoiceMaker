@@ -236,3 +236,61 @@ textarea { resize: vertical; min-height: 80px; }
 .history-inv-date { font-size: 12px; color: var(--gray-400); margin-top: 2px; }
 .history-inv-amount { font-size: 15px; font-weight: 700; color: var(--gray-800); }
 .history-current-tag { font-size: 10px; background: var(--blue); color: #fff; padding: 2px 6px; border-radius: 4px; font-weight: 600; letter-spacing: 0.03em; }
+
+/* ═══════════════════════════════════════════════════
+   ESTIMATES — CLIENT VIEW
+═══════════════════════════════════════════════════ */
+.est-card { border: 1px solid var(--gray-200); border-radius: 12px; padding: 24px; margin-bottom: 16px; background: #fff; }
+.est-card-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px; }
+.est-num { font-size: 15px; font-weight: 700; color: var(--gray-800); }
+.est-date { font-size: 12px; color: var(--gray-400); margin-top: 2px; }
+.est-status-badge { display: inline-block; padding: 4px 12px; border-radius: 999px; font-size: 12px; font-weight: 600; }
+.est-status-pending { background: #fef3c7; color: #92400e; }
+.est-status-approved { background: var(--green-light); color: var(--green); }
+.est-status-rejected { background: #fee2e2; color: #991b1b; }
+
+.est-items { margin-bottom: 12px; }
+.est-item-row { display: flex; justify-content: space-between; align-items: flex-start; padding: 10px 0; border-bottom: 1px solid var(--gray-100); gap: 12px; }
+.est-item-row:last-child { border-bottom: none; }
+.est-item-info { flex: 1; }
+.est-item-desc { font-size: 14px; font-weight: 600; color: var(--gray-800); }
+.est-item-expl { font-size: 12px; color: var(--gray-500); margin-top: 3px; line-height: 1.5; }
+.est-item-days { font-size: 11px; color: var(--gray-400); margin-top: 2px; }
+.est-item-cost { font-size: 14px; font-weight: 700; color: var(--gray-800); white-space: nowrap; }
+
+.est-subtotal-row { display: flex; justify-content: space-between; font-size: 13px; color: var(--gray-500); padding: 3px 0; }
+
+.est-big-row { display: flex; gap: 16px; margin: 20px 0; padding: 20px; background: var(--gray-50); border-radius: 10px; border: 1px solid var(--gray-200); flex-wrap: wrap; }
+.est-big-block { flex: 1; min-width: 140px; }
+.est-big-right { text-align: right; }
+.est-big-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--gray-500); font-weight: 600; margin-bottom: 4px; }
+.est-big-value { font-size: 28px; font-weight: 800; line-height: 1.1; }
+.est-big-total { color: #0f766e; }
+.est-big-date { color: var(--gray-800); font-size: 22px; }
+
+.est-notes { font-size: 13px; color: var(--gray-500); margin-bottom: 16px; padding: 10px 12px; background: var(--gray-50); border-radius: 6px; border-left: 3px solid var(--gray-200); }
+
+.est-actions { display: flex; gap: 10px; flex-wrap: wrap; margin: 16px 0 4px; }
+.est-btn-approve { background: #16a34a; color: #fff; border: none; padding: 10px 20px; border-radius: 6px; font-size: 14px; font-weight: 600; cursor: pointer; }
+.est-btn-approve:hover { background: #15803d; }
+.est-btn-reject { background: #fff; color: #dc2626; border: 2px solid #dc2626; padding: 10px 20px; border-radius: 6px; font-size: 14px; font-weight: 600; cursor: pointer; }
+.est-btn-reject:hover { background: #fee2e2; }
+.est-btn-question { background: #fff; color: var(--blue); border: 2px solid var(--blue); padding: 10px 20px; border-radius: 6px; font-size: 14px; font-weight: 600; cursor: pointer; }
+.est-btn-question:hover { background: #eff6ff; }
+
+/* ═══════════════════════════════════════════════════
+   CHAT BUBBLES (shared by client + manager views)
+═══════════════════════════════════════════════════ */
+.est-chat-section { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--gray-100); }
+.est-chat-title { font-size: 12px; font-weight: 700; color: var(--gray-400); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 12px; }
+.chat-bubble { max-width: 80%; margin-bottom: 10px; }
+.chat-bubble-client { margin-left: auto; }
+.chat-bubble-manager { margin-right: auto; }
+.chat-bubble-meta { font-size: 11px; color: var(--gray-400); margin-bottom: 3px; }
+.chat-bubble-client .chat-bubble-meta { text-align: right; }
+.chat-bubble-text { padding: 10px 14px; border-radius: 12px; font-size: 14px; line-height: 1.5; word-break: break-word; }
+.chat-bubble-client .chat-bubble-text { background: var(--blue); color: #fff; border-radius: 12px 12px 2px 12px; }
+.chat-bubble-manager .chat-bubble-text { background: var(--gray-100); color: var(--gray-800); border-radius: 12px 12px 12px 2px; }
+
+/* Manager estimates table */
+.badge-rejected { background: #fee2e2; color: #991b1b; }

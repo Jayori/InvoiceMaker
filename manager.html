@@ -39,6 +39,14 @@
             <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
             New Invoice
           </a>
+          <a href="#" class="mgr-nav-item" onclick="showTab('estimates',this)">
+            <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/></svg>
+            Estimates
+          </a>
+          <a href="#" class="mgr-nav-item" onclick="showTab('new-estimate',this)">
+            <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+            New Estimate
+          </a>
           <a href="#" class="mgr-nav-item" onclick="showTab('clients',this)">
             <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
             Clients
@@ -252,6 +260,146 @@
               <tbody id="clients-tbody"></tbody>
             </table>
             <div id="clients-empty" class="empty-state" style="display:none;"><p>No saved clients yet.</p></div>
+          </div>
+        </div>
+
+        <!-- Estimates list -->
+        <div id="tab-estimates" class="mgr-tab" style="display:none;">
+          <div class="section-header">
+            <h1 class="section-title">Estimates</h1>
+            <div style="display:flex;gap:10px;align-items:center;">
+              <select id="est-status-filter" onchange="loadEstimates()" class="filter-select">
+                <option value="">All</option>
+                <option value="pending">Pending</option>
+                <option value="approved">Approved</option>
+                <option value="rejected">Rejected</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="invoice-table-wrap">
+            <div id="est-loading" style="padding:40px;text-align:center;color:var(--gray-400);">Loading...</div>
+            <table class="invoice-table" id="est-table" style="display:none;">
+              <thead><tr>
+                <th>Client</th>
+                <th>Estimate #</th>
+                <th>Date</th>
+                <th>Completion</th>
+                <th>Total</th>
+                <th>Status</th>
+                <th>Msgs</th>
+                <th></th>
+              </tr></thead>
+              <tbody id="est-tbody"></tbody>
+            </table>
+            <div id="est-empty" class="empty-state" style="display:none;"><p>No estimates yet.</p></div>
+          </div>
+
+          <!-- Estimate detail panel -->
+          <div id="est-detail-panel" style="display:none;margin-top:24px;">
+            <div class="card">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+                <div class="card-title" id="est-detail-title" style="margin:0;">Estimate</div>
+                <button class="btn btn-sm btn-secondary" onclick="closeEstimateDetail()">✕ Close</button>
+              </div>
+              <div id="est-detail-info" style="margin-bottom:20px;font-size:14px;color:var(--gray-600);"></div>
+
+              <!-- Chat thread -->
+              <div class="card-title" style="font-size:13px;margin-bottom:12px;">Messages</div>
+              <div id="est-chat-thread" style="min-height:60px;margin-bottom:16px;"></div>
+
+              <!-- Reply form -->
+              <div style="display:flex;gap:10px;align-items:flex-end;">
+                <textarea id="est-reply-input" placeholder="Type your reply..." style="flex:1;resize:vertical;min-height:60px;"></textarea>
+                <button class="btn btn-primary" onclick="sendEstimateReply()">Send Reply</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- New Estimate -->
+        <div id="tab-new-estimate" class="mgr-tab" style="display:none;">
+          <div class="section-header">
+            <h1 class="section-title">New Estimate</h1>
+          </div>
+
+          <form id="estimate-form" onsubmit="submitEstimate(event)">
+
+            <div class="card">
+              <div class="card-title">Client</div>
+              <div class="form-grid">
+                <div class="form-group full">
+                  <label>Saved Clients</label>
+                  <select id="est-client-select" onchange="fillEstimateClient(this.value)">
+                    <option value="">— Select a saved client or fill in below —</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label>Client Name *</label>
+                  <input type="text" id="est-client-name" placeholder="Jane Smith" required>
+                </div>
+                <div class="form-group">
+                  <label>Client Email *</label>
+                  <input type="email" id="est-client-email" placeholder="jane@example.com" required>
+                </div>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="card-title">Estimate Items</div>
+              <div class="items-table-wrap">
+                <table class="items-table" id="est-items-table">
+                  <thead><tr>
+                    <th style="width:22%;">Type</th>
+                    <th style="width:35%;">Description &amp; Explanation</th>
+                    <th style="width:15%;">Cost ($)</th>
+                    <th style="width:20%;">Est. Days</th>
+                    <th style="width:8%;"></th>
+                  </tr></thead>
+                  <tbody id="est-items-tbody"></tbody>
+                </table>
+              </div>
+              <div class="add-item-row">
+                <button type="button" class="btn btn-secondary btn-sm" onclick="addEstimateItem()">+ Add Item</button>
+              </div>
+
+              <!-- Tax -->
+              <div style="margin-top:16px;display:flex;align-items:center;gap:12px;">
+                <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px;">
+                  <input type="checkbox" id="est-tax-toggle" onchange="toggleEstimateTax()"> Add Tax
+                </label>
+                <div id="est-tax-input-wrap" style="display:none;align-items:center;gap:6px;">
+                  <input type="number" id="est-tax-rate" value="8" min="0" max="100" step="0.1" oninput="recalcEstimateTotals()" style="width:70px;">
+                  <span style="font-size:14px;color:var(--gray-500);">%</span>
+                </div>
+              </div>
+
+              <div class="totals-section">
+                <table class="totals-table">
+                  <tr><td>Subtotal</td><td id="est-subtotal-display">$0.00</td></tr>
+                  <tr id="est-tax-row" style="display:none;"><td id="est-tax-label">Tax (8%)</td><td id="est-tax-display">$0.00</td></tr>
+                  <tr class="total-row"><td>Total Estimate</td><td id="est-total-display">$0.00</td></tr>
+                </table>
+                <div id="est-completion-display" style="display:none;margin-top:16px;padding:14px 16px;background:#f0fdf4;border-radius:8px;border:1px solid #bbf7d0;">
+                  <div style="font-size:11px;color:#15803d;text-transform:uppercase;letter-spacing:0.05em;font-weight:600;">Estimated Completion</div>
+                  <div id="est-completion-date" style="font-size:20px;font-weight:700;color:#166534;margin-top:4px;"></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="card-title">Notes (optional)</div>
+              <textarea id="est-notes" placeholder="Any additional notes for the client..." style="width:100%;"></textarea>
+            </div>
+
+            <div class="form-actions">
+              <button type="button" class="btn btn-secondary" onclick="resetEstimateForm()">Clear</button>
+              <button type="submit" class="btn btn-primary" id="est-submit-btn">Send Estimate</button>
+            </div>
+          </form>
+
+          <div id="est-success" class="invoice-success" style="display:none;">
+            <strong>Estimate sent!</strong> <span id="est-success-detail"></span>
           </div>
         </div>
 
