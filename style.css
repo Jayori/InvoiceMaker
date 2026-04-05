@@ -226,6 +226,7 @@ textarea { resize: vertical; min-height: 80px; }
 /* ═══════════════════════════════════════════════════
    CLIENT INVOICE HISTORY
 ═══════════════════════════════════════════════════ */
+.inv-client-greeting { font-size: 20px; font-weight: 700; color: var(--gray-800); margin-bottom: 20px; padding-bottom: 16px; border-bottom: 2px solid var(--gray-100); }
 .inv-history-title { font-size: 14px; font-weight: 700; color: var(--gray-500); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 2px solid var(--gray-100); }
 .history-item { display: flex; justify-content: space-between; align-items: flex-start; padding: 14px 16px; border-radius: 8px; background: var(--gray-50); border: 1px solid var(--gray-200); margin-bottom: 8px; gap: 12px; }
 .history-item-current { border-color: var(--blue); background: #eff6ff; }

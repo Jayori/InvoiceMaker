@@ -116,9 +116,9 @@ function buildEmail({ invoiceNumber, passcode, clientName, business, items, subt
   <tr><td style="padding:28px 40px 0;">
     <table width="100%" cellpadding="0" cellspacing="0" style="background:#eff6ff;border-radius:8px;border:1px solid #bfdbfe;">
       <tr><td style="padding:20px 24px;">
-        <p style="margin:0 0 4px;color:#1e40af;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;">Your Invoice Passcode</p>
+        <p style="margin:0 0 4px;color:#1e40af;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;">Your Access Code</p>
         <p style="margin:0 0 8px;font-size:32px;font-weight:700;letter-spacing:0.15em;color:#1a56db;font-family:monospace;">${escHtml(passcode)}</p>
-        <p style="margin:0;color:#3730a3;font-size:13px;">Visit <a href="${appUrl}/client.html" style="color:#1a56db;">${appUrl}/client.html</a> and enter this code to view and pay your invoice.</p>
+        <p style="margin:0;color:#3730a3;font-size:13px;">Visit <a href="${appUrl}/client.html" style="color:#1a56db;">${appUrl}/client.html</a> and enter this code to view all your invoices. This code stays the same for all future invoices.</p>
       </td></tr>
     </table>
   </td></tr>
@@ -153,7 +153,23 @@ exports.handler = async (event) => {
   const taxAmount = subtotal * (taxRate / 100);
   const total = subtotal + taxAmount;
   const invoiceNumber = generateInvoiceNumber();
-  const passcode = generatePasscode();
+
+  // Find or create client to get their permanent passcode
+  const normalizedEmail = clientEmail.toLowerCase().trim();
+  const { data: existingClient } = await supabase
+    .from('clients').select('id, passcode').eq('email', normalizedEmail).maybeSingle();
+
+  let passcode;
+  if (existingClient?.passcode) {
+    passcode = existingClient.passcode;
+  } else {
+    passcode = generatePasscode();
+    if (existingClient) {
+      await supabase.from('clients').update({ passcode }).eq('id', existingClient.id);
+    } else {
+      await supabase.from('clients').insert({ name: clientName, email: normalizedEmail, passcode });
+    }
+  }
 
   // Fetch business profile
   const { data: business = {} } = await supabase.from('business_profile').select('*').eq('id', 1).single();

@@ -13,8 +13,8 @@
     <!-- Passcode entry -->
     <div id="passcode-view" class="client-card">
       <div class="client-biz-name" id="client-biz-name">Invoice Pro</div>
-      <h2 class="client-heading">Enter Your Invoice Passcode</h2>
-      <p class="client-sub">Your passcode was emailed to you when your invoice was sent.</p>
+      <h2 class="client-heading">Enter Your Access Code</h2>
+      <p class="client-sub">Your 6-character code was emailed to you when your first invoice was sent.</p>
 
       <form onsubmit="lookupInvoice(event)">
         <input type="text" id="passcode-input" class="passcode-input"
@@ -24,7 +24,7 @@
           autocapitalize="characters"
           spellcheck="false"
           required>
-        <button type="submit" class="btn btn-primary btn-block" id="lookup-btn">View My Invoice</button>
+        <button type="submit" class="btn btn-primary btn-block" id="lookup-btn">View My Invoices</button>
       </form>
 
       <div id="lookup-error" class="client-error" style="display:none;"></div>
@@ -35,6 +35,8 @@
     <!-- Invoice view -->
     <div id="invoice-view" class="client-card" style="display:none;">
       <div class="client-biz-name" id="invoice-biz-name">Invoice Pro</div>
+
+      <div id="inv-client-greeting" class="inv-client-greeting" style="display:none;"></div>
 
       <div class="inv-header">
         <div>

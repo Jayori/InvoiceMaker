@@ -344,6 +344,7 @@ async function loadClients() {
         <td>${esc(c.email)}</td>
         <td>${esc(c.phone || '—')}</td>
         <td>${esc(c.company || '—')}</td>
+        <td><code style="font-size:13px;letter-spacing:0.1em;background:var(--gray-100);padding:2px 6px;border-radius:4px;">${esc(c.passcode || '—')}</code></td>
         <td style="display:flex;gap:8px;">
           <button class="btn btn-sm btn-secondary" onclick="editClient('${c.id}')">Edit</button>
           <button class="btn btn-sm btn-danger" onclick="deleteClient('${c.id}')">Delete</button>

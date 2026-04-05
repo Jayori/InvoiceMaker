@@ -43,23 +43,70 @@ async function loadInvoice(code, justPaid) {
     const data = await res.json();
 
     if (!res.ok) {
-      if (errEl) { errEl.textContent = data.error || 'Invoice not found.'; errEl.style.display = ''; }
+      if (errEl) { errEl.textContent = data.error || 'Code not found.'; errEl.style.display = ''; }
       return;
     }
 
-    showInvoice(data, justPaid);
+    if (data.mode === 'profile') {
+      showProfile(data.client, data.invoices, justPaid);
+    } else {
+      // Legacy fallback: old per-invoice passcode
+      showInvoice(data, justPaid);
+      loadInvoiceHistory(data.client_email, data.id);
+    }
   } catch {
     if (errEl) { errEl.textContent = 'Something went wrong. Please try again.'; errEl.style.display = ''; }
   } finally {
-    if (btn) { btn.disabled = false; btn.textContent = 'View My Invoice'; }
+    if (btn) { btn.disabled = false; btn.textContent = 'View My Invoices'; }
   }
 }
 
+// ── Profile mode (new) ────────────────────────────────────────────────────────
+
+function showProfile(client, invoices, justPaid) {
+  document.getElementById('passcode-view').style.display = 'none';
+  document.getElementById('invoice-view').style.display = '';
+
+  // Greeting
+  const greetEl = document.getElementById('inv-client-greeting');
+  if (greetEl) { greetEl.textContent = `Hello, ${client.name}`; greetEl.style.display = ''; }
+
+  // Feature the first unpaid invoice, or most recent if all paid
+  const pending = invoices.filter(i => i.status !== 'paid');
+  const featured = pending[0] || invoices[0];
+
+  if (featured) {
+    renderInvoiceDetails(featured, justPaid);
+  } else {
+    // No invoices yet — hide invoice details area
+    document.getElementById('inv-header').style.display = 'none';
+    document.getElementById('inv-meta').style.display = 'none';
+    document.querySelector('.inv-items-table').style.display = 'none';
+    document.getElementById('inv-totals').style.display = 'none';
+    document.getElementById('pay-section').style.display = 'none';
+  }
+
+  showHistoryFromList(invoices, featured?.id);
+}
+
+// ── Invoice detail rendering ──────────────────────────────────────────────────
+
 function showInvoice(inv, justPaid) {
   document.getElementById('passcode-view').style.display = 'none';
-  const view = document.getElementById('invoice-view');
-  view.style.display = '';
-  loadInvoiceHistory(inv.client_email, inv.id);
+  document.getElementById('invoice-view').style.display = '';
+  renderInvoiceDetails(inv, justPaid);
+}
+
+function renderInvoiceDetails(inv, justPaid) {
+  // Restore visibility in case showProfile hid them
+  ['inv-header', 'inv-meta'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = '';
+  });
+  const table = document.querySelector('.inv-items-table');
+  if (table) table.style.display = '';
+  const totals = document.getElementById('inv-totals');
+  if (totals) totals.style.display = '';
 
   document.getElementById('inv-number').textContent = inv.invoice_number;
 
@@ -98,27 +145,68 @@ function showInvoice(inv, justPaid) {
     document.getElementById('inv-tax-row').style.display = '';
     document.getElementById('inv-tax-label').textContent = `Tax (${inv.tax_rate}%)`;
     document.getElementById('inv-tax-amount').textContent = `$${Number(inv.tax_amount).toFixed(2)}`;
+  } else {
+    document.getElementById('inv-tax-row').style.display = 'none';
   }
 
   // Notes
   if (inv.notes) {
     document.getElementById('inv-notes-section').style.display = '';
     document.getElementById('inv-notes').textContent = inv.notes;
+  } else {
+    document.getElementById('inv-notes-section').style.display = 'none';
   }
 
-  // Pay button
+  // Pay button / paid notice
   if (inv.status === 'paid' || justPaid) {
     document.getElementById('pay-section').style.display = 'none';
     document.getElementById('paid-notice').style.display = '';
   } else {
+    document.getElementById('pay-section').style.display = '';
+    document.getElementById('paid-notice').style.display = 'none';
     document.getElementById('pay-btn').href = inv.square_payment_link || '#';
   }
 }
 
-async function loadInvoiceHistory(email, currentId) {
+// ── Invoice history list ──────────────────────────────────────────────────────
+
+function showHistoryFromList(invoices, currentId) {
   const section = document.getElementById('history-section');
   const loading = document.getElementById('history-loading');
   const list = document.getElementById('history-list');
+  if (!section) return;
+
+  if (!invoices || invoices.length === 0) { section.style.display = 'none'; return; }
+
+  section.style.display = '';
+  if (loading) loading.style.display = 'none';
+
+  list.innerHTML = invoices.map(inv => {
+    const isCurrent = inv.id === currentId;
+    const statusClass = inv.status === 'paid' ? 'inv-status-paid' : 'inv-status-pending';
+    const statusLabel = inv.status === 'paid' ? 'Paid' : 'Unpaid';
+    const dateStr = inv.created_at
+      ? new Date(inv.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+      : '';
+    return `
+      <div class="history-item${isCurrent ? ' history-item-current' : ''}">
+        <div class="history-item-left">
+          <div class="history-inv-num">${esc(inv.invoice_number)}${isCurrent ? ' <span class="history-current-tag">Shown Above</span>' : ''}</div>
+          <div class="history-inv-date">${dateStr}</div>
+        </div>
+        <div class="history-item-right">
+          <div class="history-inv-amount">$${Number(inv.total).toFixed(2)}</div>
+          <span class="inv-status-badge ${statusClass}">${statusLabel}</span>
+          ${inv.status !== 'paid' && !isCurrent && inv.square_payment_link ? `<a href="${esc(inv.square_payment_link)}" target="_blank" class="btn btn-sm btn-primary" style="margin-top:4px;">Pay</a>` : ''}
+        </div>
+      </div>`;
+  }).join('');
+}
+
+// Legacy fetch-based history (used for old invoice-level passcode fallback)
+async function loadInvoiceHistory(email, currentId) {
+  const section = document.getElementById('history-section');
+  const loading = document.getElementById('history-loading');
   if (!section || !email) return;
   section.style.display = '';
 
@@ -129,32 +217,9 @@ async function loadInvoiceHistory(email, currentId) {
       body: JSON.stringify({ email }),
     });
     const invoices = await res.json();
-    loading.style.display = 'none';
-
-    if (!invoices.length) { section.style.display = 'none'; return; }
-
-    list.innerHTML = invoices.map(inv => {
-      const isCurrent = inv.id === currentId;
-      const statusClass = inv.status === 'paid' ? 'inv-status-paid' : 'inv-status-pending';
-      const statusLabel = inv.status === 'paid' ? 'Paid' : 'Unpaid';
-      const dateStr = inv.created_at
-        ? new Date(inv.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-        : '';
-      return `
-        <div class="history-item${isCurrent ? ' history-item-current' : ''}">
-          <div class="history-item-left">
-            <div class="history-inv-num">${esc(inv.invoice_number)}${isCurrent ? ' <span class="history-current-tag">Current</span>' : ''}</div>
-            <div class="history-inv-date">${dateStr}</div>
-          </div>
-          <div class="history-item-right">
-            <div class="history-inv-amount">$${Number(inv.total).toFixed(2)}</div>
-            <span class="inv-status-badge ${statusClass}">${statusLabel}</span>
-            ${inv.status !== 'paid' && inv.square_payment_link ? `<a href="${esc(inv.square_payment_link)}" target="_blank" class="btn btn-sm btn-primary" style="margin-top:4px;">Pay</a>` : ''}
-          </div>
-        </div>`;
-    }).join('');
+    showHistoryFromList(invoices, currentId);
   } catch {
-    loading.textContent = 'Could not load history.';
+    if (loading) loading.textContent = 'Could not load history.';
   }
 }
 
