@@ -219,7 +219,7 @@ async function loadInvoices() {
     if (!invoices.length) { empty.style.display = ''; return; }
 
     tbody.innerHTML = invoices.map(inv => `
-      <tr>
+      <tr onclick="previewInvoice('${inv.id}')" style="cursor:pointer;" title="Click to preview">
         <td><div class="client-name">${esc(inv.client_name)}</div><div class="invoice-num">${esc(inv.client_email)}</div></td>
         <td>${esc(inv.invoice_number)}</td>
         <td><code style="font-size:13px;letter-spacing:0.1em;background:var(--gray-100);padding:2px 6px;border-radius:4px;">${esc(inv.passcode || '—')}</code></td>
@@ -227,7 +227,7 @@ async function loadInvoices() {
         <td>${inv.due_date ? formatDate(inv.due_date) : '—'}</td>
         <td class="amount">$${Number(inv.total).toFixed(2)}</td>
         <td><span class="badge badge-${inv.status}">${capitalize(inv.status)}</span></td>
-        <td style="display:flex;gap:6px;flex-wrap:wrap;">
+        <td style="display:flex;gap:6px;flex-wrap:wrap;" onclick="event.stopPropagation()">
           ${inv.square_payment_link ? `<a href="${esc(inv.square_payment_link)}" target="_blank" class="btn btn-sm btn-secondary">Link</a>` : ''}
           <button class="btn btn-sm btn-secondary" onclick="editInvoice('${inv.id}')">Edit</button>
           <button class="btn btn-sm" style="background:#fee2e2;color:#dc2626;border:none;" onclick="deleteInvoice('${inv.id}')">Delete</button>
@@ -577,6 +577,134 @@ async function regenClientCode(id, name) {
     await loadClients();
     showToast(`New code for ${name}: ${data.passcode}`, 'success');
   } catch { showToast('Failed to regenerate code.', 'error'); }
+}
+
+// ─── Invoice Preview Modal ─────────────────────────────────────────────────────
+
+function previewInvoice(id) {
+  const inv = invoicesCache.find(i => i.id === id);
+  if (!inv) { showToast('Invoice not found.', 'error'); return; }
+
+  // Resolve business name
+  const biz = businessProfilesCache.find(p => p.id === inv.business_profile_id);
+  const bizName = biz?.name || 'InvoiceMePro';
+
+  // Status badge
+  const isPaid = inv.status === 'paid';
+  const statusHtml = isPaid
+    ? `<span class="inv-status-badge inv-status-paid">Paid</span>`
+    : `<span class="inv-status-badge inv-status-pending">Payment Due</span>`;
+
+  // Due date
+  const dueStr = inv.due_date
+    ? new Date(inv.due_date).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
+    : 'Upon receipt';
+
+  // Line items
+  function buildRow(item) {
+    const lineTotal = item.quantity * item.unitPrice;
+    const disc = Math.min(Number(item.discount) || 0, lineTotal);
+    const net = lineTotal - disc;
+    const qtyLabel = item.type === 'hours' ? `${item.quantity} hrs` : `×${item.quantity}`;
+    const rateHtml = disc > 0
+      ? `<span class="item-original-amt">$${Number(item.unitPrice).toFixed(2)}</span>`
+      : `$${Number(item.unitPrice).toFixed(2)}`;
+    const discRow = disc > 0
+      ? `<tr><td colspan="3" style="padding:1px 0 6px;font-size:12px;"><span class="item-discount-credit">✓ Courtesy discount: -$${disc.toFixed(2)}</span></td><td></td></tr>`
+      : '';
+    return `<tr>
+      <td>${esc(item.description)}${item.type === 'hours' ? ' <span class="item-type-tag">hourly</span>' : ''}</td>
+      <td style="text-align:center;color:var(--gray-500);">${qtyLabel}</td>
+      <td style="text-align:right;">${rateHtml}</td>
+      <td style="text-align:right;font-weight:500;">$${net.toFixed(2)}</td>
+    </tr>${discRow}`;
+  }
+
+  const items = inv.items || [];
+  const dated = {}, undated = [];
+  items.forEach(item => {
+    if (item.workDate) {
+      if (!dated[item.workDate]) dated[item.workDate] = [];
+      dated[item.workDate].push(item);
+    } else { undated.push(item); }
+  });
+  let rowsHtml = undated.map(buildRow).join('');
+  Object.keys(dated).sort().forEach(date => {
+    const ds = new Date(date + 'T12:00:00').toLocaleDateString('en-US', { weekday:'long', month:'long', day:'numeric', year:'numeric' });
+    rowsHtml += `<tr><td colspan="4"><div class="work-date-header">${esc(ds)}</div></td></tr>`;
+    rowsHtml += dated[date].map(buildRow).join('');
+  });
+
+  // Totals
+  const taxRow = inv.tax_rate > 0
+    ? `<div class="inv-totals-row"><span>Tax (${inv.tax_rate}%)</span><span>$${Number(inv.tax_amount).toFixed(2)}</span></div>`
+    : '';
+
+  // Notes
+  const notesHtml = inv.notes
+    ? `<div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--gray-100);">
+        <div class="inv-label">Notes</div>
+        <div class="inv-notes-text">${esc(inv.notes)}</div>
+       </div>`
+    : '';
+
+  // Photos
+  const photos = inv.receipt_photos || [];
+  const photosHtml = photos.length
+    ? `<div style="margin-top:16px;"><div class="inv-label" style="margin-bottom:8px;">Photos</div>
+       <div class="receipt-photos-wrap">${photos.map(p => `<img src="${esc(p)}" class="receipt-thumb" onclick="window.open('${esc(p)}','_blank')">`).join('')}</div></div>`
+    : '';
+
+  document.getElementById('inv-preview-body').innerHTML = `
+    <div class="inv-preview-bizname">${esc(bizName)}</div>
+    <div class="inv-header">
+      <div>
+        <div class="inv-number">${esc(inv.invoice_number)}</div>
+        ${statusHtml}
+      </div>
+      <div class="inv-total-big">$${Number(inv.total).toFixed(2)}</div>
+    </div>
+    <div class="inv-meta">
+      <div><span class="inv-label">Billed To</span><span class="inv-val">${esc(inv.client_name)}</span></div>
+      <div><span class="inv-label">Due Date</span><span class="inv-val">${dueStr}</span></div>
+    </div>
+    <table class="inv-items-table" style="margin-top:20px;">
+      <thead><tr>
+        <th>Description</th>
+        <th style="text-align:center;">Qty</th>
+        <th style="text-align:right;">Rate</th>
+        <th style="text-align:right;">Total</th>
+      </tr></thead>
+      <tbody>${rowsHtml}</tbody>
+    </table>
+    <div class="inv-totals">
+      <div class="inv-totals-row"><span>Subtotal</span><span>$${Number(inv.subtotal).toFixed(2)}</span></div>
+      ${taxRow}
+      <div class="inv-totals-row inv-totals-total"><span>Total Due</span><span>$${Number(inv.total).toFixed(2)}</span></div>
+    </div>
+    ${notesHtml}
+    ${photosHtml}
+  `;
+
+  const footer = document.getElementById('inv-preview-footer');
+  footer.innerHTML = isPaid
+    ? `<span class="paid-notice" style="display:inline-block;margin:0;">Payment received — thank you!</span>`
+    : (inv.square_payment_link
+        ? `<a href="${esc(inv.square_payment_link)}" target="_blank" class="btn btn-primary">View Payment Link ↗</a>`
+        : `<span style="font-size:13px;color:var(--gray-400);">No payment link generated.</span>`);
+  footer.innerHTML += `<span class="inv-preview-hint">Client view preview</span>`;
+
+  document.getElementById('inv-preview-modal').classList.add('is-open');
+  document.body.style.overflow = 'hidden';
+}
+
+function closePreviewModal() {
+  document.getElementById('inv-preview-modal').classList.remove('is-open');
+  document.body.style.overflow = '';
+}
+
+function handlePreviewOverlayClick(e) {
+  if (e.target === document.getElementById('inv-preview-modal')) closePreviewModal();
 }
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
