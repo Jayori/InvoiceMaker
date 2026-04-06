@@ -175,7 +175,13 @@
         <!-- New Invoice -->
         <div id="tab-new-invoice" class="mgr-tab" style="display:none;">
           <div class="section-header">
-            <h1 class="section-title">New Invoice</h1>
+            <h1 class="section-title" id="invoice-form-title">New Invoice</h1>
+          </div>
+
+          <!-- Edit mode banner -->
+          <div id="inv-edit-banner" style="display:none;background:#fef3c7;border:1px solid #f59e0b;border-radius:8px;padding:12px 20px;margin-bottom:20px;display:flex;justify-content:space-between;align-items:center;">
+            <span style="font-size:14px;font-weight:600;color:#92400e;">Editing: <span id="inv-edit-number"></span></span>
+            <button type="button" class="btn btn-sm btn-secondary" onclick="cancelInvoiceEdit()">✕ Cancel Edit</button>
           </div>
 
           <form id="invoice-form" onsubmit="submitInvoice(event)">
@@ -286,6 +292,9 @@
               <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px;color:var(--gray-600);">
                 <input type="checkbox" id="inv-send-sms"> Also text client
               </label>
+              <label id="inv-resend-wrap" style="display:none;align-items:center;gap:8px;cursor:pointer;font-size:14px;color:var(--gray-600);">
+                <input type="checkbox" id="inv-resend" checked> Resend to client
+              </label>
               <button type="submit" class="btn btn-primary" id="submit-btn">Send Invoice & Payment Link</button>
             </div>
           </form>
@@ -358,7 +367,13 @@
         <!-- New Estimate -->
         <div id="tab-new-estimate" class="mgr-tab" style="display:none;">
           <div class="section-header">
-            <h1 class="section-title">New Estimate</h1>
+            <h1 class="section-title" id="estimate-form-title">New Estimate</h1>
+          </div>
+
+          <!-- Edit mode banner -->
+          <div id="est-edit-banner" style="display:none;background:#fef3c7;border:1px solid #f59e0b;border-radius:8px;padding:12px 20px;margin-bottom:20px;display:flex;justify-content:space-between;align-items:center;">
+            <span style="font-size:14px;font-weight:600;color:#92400e;">Editing: <span id="est-edit-number"></span></span>
+            <button type="button" class="btn btn-sm btn-secondary" onclick="cancelEstimateEdit()">✕ Cancel Edit</button>
           </div>
 
           <form id="estimate-form" onsubmit="submitEstimate(event)">
@@ -463,6 +478,9 @@
               <button type="button" class="btn btn-secondary" onclick="resetEstimateForm()">Clear</button>
               <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px;color:var(--gray-600);">
                 <input type="checkbox" id="est-send-sms"> Also text client
+              </label>
+              <label id="est-resend-wrap" style="display:none;align-items:center;gap:8px;cursor:pointer;font-size:14px;color:var(--gray-600);">
+                <input type="checkbox" id="est-resend" checked> Resend to client
               </label>
               <button type="submit" class="btn btn-primary" id="est-submit-btn">Send Estimate</button>
             </div>

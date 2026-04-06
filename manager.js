@@ -115,6 +115,8 @@ async function saveBusinessProfile() {
 
 // ─── Invoice list ──────────────────────────────────────────────────────────────
 
+let invoicesCache = [];
+
 async function loadInvoices() {
   const loading = document.getElementById('dash-loading');
   const table = document.getElementById('invoice-table');
@@ -127,6 +129,7 @@ async function loadInvoices() {
   try {
     const res = await fetch('/api/get-invoices');
     let invoices = await res.json();
+    invoicesCache = invoices;
     if (filter) invoices = invoices.filter(i => i.status === filter);
 
     loading.style.display = 'none';
@@ -143,6 +146,7 @@ async function loadInvoices() {
         <td><span class="badge badge-${inv.status}">${capitalize(inv.status)}</span></td>
         <td style="display:flex;gap:6px;flex-wrap:wrap;">
           ${inv.square_payment_link ? `<a href="${esc(inv.square_payment_link)}" target="_blank" class="btn btn-sm btn-secondary">Link</a>` : ''}
+          <button class="btn btn-sm btn-secondary" onclick="editInvoice('${inv.id}')">Edit</button>
           <button class="btn btn-sm btn-secondary" onclick="saveClientFromRow('${escAttr(inv.client_name)}','${escAttr(inv.client_email)}','${escAttr(inv.client_phone||'')}','${escAttr(inv.client_company||'')}','${escAttr(inv.client_address||'')}')" title="Save client to contacts">+ Client</button>
         </td>
       </tr>`).join('');
@@ -300,8 +304,15 @@ async function submitInvoice(e) {
   const btn = document.getElementById('submit-btn');
   btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Sending...';
 
+  const isEdit = !!currentEditInvoiceId;
+
   try {
-    const res = await fetch('/api/create-invoice', {
+    const url = isEdit ? '/api/update-invoice' : '/api/create-invoice';
+    if (isEdit) {
+      payload.invoiceId = currentEditInvoiceId;
+      payload.resendEmail = document.getElementById('inv-resend').checked;
+    }
+    const res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
@@ -310,19 +321,26 @@ async function submitInvoice(e) {
     if (!res.ok) throw new Error(`${data.error || 'Failed'}${data.detail ? ': ' + data.detail : ''}`);
 
     const successEl = document.getElementById('invoice-success');
-    document.getElementById('success-detail').textContent =
-      `${data.invoice_number} sent to ${payload.clientEmail}. Client passcode: ${data.passcode}`;
+    if (isEdit) {
+      document.getElementById('success-detail').textContent =
+        `${data.invoice_number} updated${payload.resendEmail ? ' and resent to ' + payload.clientEmail : ''}.`;
+    } else {
+      document.getElementById('success-detail').textContent =
+        `${data.invoice_number} sent to ${payload.clientEmail}. Client passcode: ${data.passcode}`;
+    }
     successEl.style.display = '';
     resetInvoiceForm();
+    loadInvoices();
     setTimeout(() => { successEl.style.display = 'none'; }, 8000);
   } catch (err) {
     showToast(err.message, 'error');
   } finally {
-    btn.disabled = false; btn.innerHTML = 'Send Invoice & Payment Link';
+    btn.disabled = false; btn.innerHTML = isEdit ? 'Update Invoice' : 'Send Invoice & Payment Link';
   }
 }
 
 function resetInvoiceForm() {
+  currentEditInvoiceId = null;
   document.getElementById('invoice-form').reset();
   document.getElementById('items-tbody').innerHTML = '';
   itemId = 0;
@@ -334,6 +352,15 @@ function resetInvoiceForm() {
     const el = document.getElementById(id);
     if (el) el.value = '';
   });
+  // Reset edit mode UI
+  const banner = document.getElementById('inv-edit-banner');
+  if (banner) banner.style.display = 'none';
+  const resendWrap = document.getElementById('inv-resend-wrap');
+  if (resendWrap) resendWrap.style.display = 'none';
+  const title = document.getElementById('invoice-form-title');
+  if (title) title.textContent = 'New Invoice';
+  const btn = document.getElementById('submit-btn');
+  if (btn) btn.textContent = 'Send Invoice & Payment Link';
   recalcTotals();
   addItem();
 }
@@ -480,6 +507,8 @@ function capitalize(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
 
 // ─── Estimates list ────────────────────────────────────────────────────────────
 
+let estimatesCache = [];
+
 async function loadEstimates() {
   const loading = document.getElementById('est-loading');
   const table = document.getElementById('est-table');
@@ -495,6 +524,7 @@ async function loadEstimates() {
     const url = filter ? `/api/get-estimates?status=${filter}` : '/api/get-estimates';
     const res = await fetch(url);
     const estimates = await res.json();
+    estimatesCache = estimates;
 
     if (loading) loading.style.display = 'none';
     if (!estimates.length) { if (empty) empty.style.display = ''; return; }
@@ -514,8 +544,9 @@ async function loadEstimates() {
         <td id="msg-count-${est.id}"><span style="color:var(--gray-400);font-size:12px;">—</span></td>
         <td style="display:flex;gap:6px;flex-wrap:wrap;">
           <button class="btn btn-sm btn-secondary" onclick="openEstimateDetail('${est.id}')">View</button>
+          <button class="btn btn-sm btn-secondary" onclick="editEstimate('${est.id}')">Edit</button>
           ${est.status === 'approved' ? `<button class="btn btn-sm btn-primary" onclick="openEstimateDetail('${est.id}')" title="Convert to invoice" style="background:#0f766e;">Invoice →</button>` : ''}
-          <button class="btn btn-sm btn-secondary" onclick="saveClientFromRow('${escAttr(est.client_name)}','${escAttr(est.client_email)}','${escAttr(est.client_phone||'')}','${escAttr(est.client_company||'')}','${escAttr(est.client_address||'')}')" title="Save client to contacts">+ Client</button>
+          <button class="btn btn-sm btn-secondary" onclick="saveClientFromRow('${escAttr(est.client_name)}','${escAttr(est.client_email)}','${escAttr(est.client_phone||'')}','${escAttr(est.client_address||'')}')" title="Save client to contacts">+ Client</button>
         </td>
       </tr>`;
     }).join('');
@@ -892,8 +923,15 @@ async function submitEstimate(e) {
   const btn = document.getElementById('est-submit-btn');
   btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Sending...';
 
+  const isEdit = !!currentEditEstimateId;
+
   try {
-    const res = await fetch('/api/create-estimate', {
+    const url = isEdit ? '/api/update-estimate' : '/api/create-estimate';
+    if (isEdit) {
+      payload.estimateId = currentEditEstimateId;
+      payload.resendEmail = document.getElementById('est-resend').checked;
+    }
+    const res = await fetch(url, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     });
@@ -901,19 +939,26 @@ async function submitEstimate(e) {
     if (!res.ok) throw new Error(`${data.error || 'Failed'}${data.detail ? ': ' + data.detail : ''}`);
 
     const successEl = document.getElementById('est-success');
-    document.getElementById('est-success-detail').textContent =
-      `${data.estimate_number} sent to ${payload.clientEmail}. Client access code: ${data.passcode}`;
+    if (isEdit) {
+      document.getElementById('est-success-detail').textContent =
+        `${data.estimate_number} updated${payload.resendEmail ? ' and resent to ' + payload.clientEmail : ''}.`;
+    } else {
+      document.getElementById('est-success-detail').textContent =
+        `${data.estimate_number} sent to ${payload.clientEmail}. Client access code: ${data.passcode}`;
+    }
     successEl.style.display = '';
     resetEstimateForm();
+    loadEstimates();
     setTimeout(() => { successEl.style.display = 'none'; }, 8000);
   } catch (err) {
     showToast(err.message, 'error');
   } finally {
-    btn.disabled = false; btn.innerHTML = 'Send Estimate';
+    btn.disabled = false; btn.innerHTML = isEdit ? 'Update Estimate' : 'Send Estimate';
   }
 }
 
 function resetEstimateForm() {
+  currentEditEstimateId = null;
   document.getElementById('estimate-form').reset();
   document.getElementById('est-items-tbody').innerHTML = '';
   estItemId = 0;
@@ -925,6 +970,15 @@ function resetEstimateForm() {
   ['est-client-name','est-client-email','est-client-phone','est-client-company','est-client-address','est-notes'].forEach(id => {
     const el = document.getElementById(id); if (el) el.value = '';
   });
+  // Reset edit mode UI
+  const banner = document.getElementById('est-edit-banner');
+  if (banner) banner.style.display = 'none';
+  const resendWrap = document.getElementById('est-resend-wrap');
+  if (resendWrap) resendWrap.style.display = 'none';
+  const title = document.getElementById('estimate-form-title');
+  if (title) title.textContent = 'New Estimate';
+  const btn = document.getElementById('est-submit-btn');
+  if (btn) btn.textContent = 'Send Estimate';
   recalcEstimateTotals();
   addEstimateItem();
 }
@@ -935,6 +989,114 @@ function populateEstimateClientDropdown() {
   if (!sel || !clientsCache.length) return;
   sel.innerHTML = '<option value="">— Select a saved client or fill in below —</option>' +
     clientsCache.map(c => `<option value="${c.id}">${esc(c.name)}${c.company ? ` (${esc(c.company)})` : ''}</option>`).join('');
+}
+
+// ─── Edit Invoice / Estimate ──────────────────────────────────────────────────
+
+let currentEditInvoiceId = null;
+let currentEditEstimateId = null;
+
+function editInvoice(id) {
+  const inv = invoicesCache.find(i => i.id === id);
+  if (!inv) { showToast('Invoice not found.', 'error'); return; }
+
+  currentEditInvoiceId = id;
+
+  // Switch to new-invoice tab
+  document.querySelectorAll('.mgr-tab').forEach(t => t.style.display = 'none');
+  document.querySelectorAll('.mgr-nav-item').forEach(a => a.classList.remove('active'));
+  document.getElementById('tab-new-invoice').style.display = '';
+  const navLink = Array.from(document.querySelectorAll('.mgr-nav-item')).find(l => l.getAttribute('onclick')?.includes('new-invoice'));
+  if (navLink) navLink.classList.add('active');
+
+  // Show edit banner
+  const banner = document.getElementById('inv-edit-banner');
+  banner.style.display = 'flex';
+  document.getElementById('inv-edit-number').textContent = inv.invoice_number;
+  document.getElementById('invoice-form-title').textContent = 'Edit Invoice';
+  document.getElementById('submit-btn').textContent = 'Update Invoice';
+  const resendWrap = document.getElementById('inv-resend-wrap');
+  resendWrap.style.display = 'flex';
+
+  // Prefill client info
+  document.getElementById('client-name').value = inv.client_name || '';
+  document.getElementById('client-email').value = inv.client_email || '';
+  document.getElementById('client-phone').value = inv.client_phone || '';
+  document.getElementById('client-company').value = inv.client_company || '';
+  document.getElementById('client-address').value = inv.client_address || '';
+  document.getElementById('due-date').value = inv.due_date ? inv.due_date.split('T')[0] : '';
+  document.getElementById('notes').value = inv.notes || '';
+
+  // Prefill tax
+  const useTax = inv.tax_rate > 0;
+  document.getElementById('tax-toggle').checked = useTax;
+  document.getElementById('tax-input-wrap').style.display = useTax ? 'flex' : 'none';
+  if (useTax) document.getElementById('tax-rate').value = inv.tax_rate;
+
+  // Prefill line items
+  document.getElementById('items-tbody').innerHTML = '';
+  itemId = 0;
+  (inv.items || []).forEach(item => {
+    addItem(item.description, item.type || 'item', item.quantity, item.unitPrice, item.discount || '', item.workDate || '');
+  });
+  recalcTotals();
+
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function cancelInvoiceEdit() {
+  resetInvoiceForm();
+}
+
+function editEstimate(id) {
+  const est = estimatesCache.find(e => e.id === id);
+  if (!est) { showToast('Estimate not found.', 'error'); return; }
+
+  currentEditEstimateId = id;
+
+  // Switch to new-estimate tab
+  document.querySelectorAll('.mgr-tab').forEach(t => t.style.display = 'none');
+  document.querySelectorAll('.mgr-nav-item').forEach(a => a.classList.remove('active'));
+  document.getElementById('tab-new-estimate').style.display = '';
+  const navLink = Array.from(document.querySelectorAll('.mgr-nav-item')).find(l => l.getAttribute('onclick')?.includes('new-estimate'));
+  if (navLink) navLink.classList.add('active');
+
+  // Show edit banner
+  const banner = document.getElementById('est-edit-banner');
+  banner.style.display = 'flex';
+  document.getElementById('est-edit-number').textContent = est.estimate_number;
+  document.getElementById('estimate-form-title').textContent = 'Edit Estimate';
+  document.getElementById('est-submit-btn').textContent = 'Update Estimate';
+  const resendWrap = document.getElementById('est-resend-wrap');
+  resendWrap.style.display = 'flex';
+
+  // Prefill client info
+  document.getElementById('est-client-name').value = est.client_name || '';
+  document.getElementById('est-client-email').value = est.client_email || '';
+  document.getElementById('est-client-phone').value = est.client_phone || '';
+  document.getElementById('est-client-company').value = est.client_company || '';
+  document.getElementById('est-client-address').value = est.client_address || '';
+  document.getElementById('est-notes').value = est.notes || '';
+
+  // Prefill tax
+  const useTax = est.tax_rate > 0;
+  document.getElementById('est-tax-toggle').checked = useTax;
+  document.getElementById('est-tax-input-wrap').style.display = useTax ? 'flex' : 'none';
+  if (useTax) document.getElementById('est-tax-rate').value = est.tax_rate;
+
+  // Prefill items
+  document.getElementById('est-items-tbody').innerHTML = '';
+  estItemId = 0;
+  (est.items || []).forEach(item => {
+    addEstimateItem(item.description, item.explanation || '', item.type || 'item', item.cost, item.estimatedDays || '');
+  });
+  recalcEstimateTotals();
+
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function cancelEstimateEdit() {
+  resetEstimateForm();
 }
 
 // ─── Photo helpers ────────────────────────────────────────────────────────────
