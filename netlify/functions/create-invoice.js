@@ -27,7 +27,7 @@ function escHtml(str) {
     .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
-function buildEmail({ invoiceNumber, passcode, clientName, business, items, subtotal, taxRate, taxAmount, total, dueDate, notes, paymentLink }) {
+function buildEmail({ invoiceNumber, passcode, clientName, clientAddress, clientCity, clientState, clientZip, business, items, subtotal, taxRate, taxAmount, total, dueDate, notes, paymentLink }) {
   const appUrl = process.env.APP_URL || '';
   const dueDateStr = dueDate
     ? new Date(dueDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
@@ -103,7 +103,11 @@ function buildEmail({ invoiceNumber, passcode, clientName, business, items, subt
         </td>
         <td style="vertical-align:top;width:33%;padding-left:20px;">
           <p style="margin:0 0 6px;color:#6b7280;font-size:11px;text-transform:uppercase;letter-spacing:0.05em;">Billed To</p>
-          <p style="margin:0;font-size:15px;font-weight:600;color:#111827;">${escHtml(clientName)}</p>
+          <div style="font-size:13px;color:#374151;line-height:1.6;">
+            <div style="font-weight:600;font-size:15px;color:#111827;">${escHtml(clientName)}</div>
+            ${clientAddress ? `<div>${escHtml(clientAddress)}</div>` : ''}
+            ${[clientCity, clientState, clientZip].filter(Boolean).length ? `<div>${escHtml([clientCity, clientState, clientZip].filter(Boolean).join(', '))}</div>` : ''}
+          </div>
         </td>
         <td style="vertical-align:top;width:33%;text-align:right;">
           <p style="margin:0 0 6px;color:#6b7280;font-size:11px;text-transform:uppercase;letter-spacing:0.05em;">Due Date</p>
@@ -172,7 +176,7 @@ exports.handler = async (event) => {
   let body;
   try { body = JSON.parse(event.body); } catch { return { statusCode: 400, body: JSON.stringify({ error: 'Invalid JSON' }) }; }
 
-  const { clientName, clientEmail, clientPhone, clientCompany, clientAddress, items, taxRate = 0, notes, dueDate, sendSmsNotification, receiptPhotos } = body;
+  const { clientName, clientEmail, clientPhone, clientCompany, clientAddress, clientCity, clientState, clientZip, items, taxRate = 0, notes, dueDate, sendSmsNotification, receiptPhotos } = body;
   if (!clientName || !clientEmail || !items?.length) {
     return { statusCode: 400, body: JSON.stringify({ error: 'clientName, clientEmail, and at least one item are required' }) };
   }
@@ -238,7 +242,7 @@ exports.handler = async (event) => {
   // Save to Supabase
   const { data: invoice, error: dbError } = await supabase
     .from('invoices')
-    .insert({ invoice_number: invoiceNumber, passcode, client_name: clientName, client_email: clientEmail, client_phone: clientPhone || null, client_company: clientCompany || null, client_address: clientAddress || null, items, subtotal, tax_rate: taxRate, tax_amount: taxAmount, total, notes: notes || null, due_date: dueDate || null, square_payment_link: squarePaymentLink, square_order_id: squareOrderId, receipt_photos: receiptPhotos?.length ? receiptPhotos : null })
+    .insert({ invoice_number: invoiceNumber, passcode, client_name: clientName, client_email: clientEmail, client_phone: clientPhone || null, client_company: clientCompany || null, client_address: clientAddress || null, client_city: clientCity || null, client_state: clientState || null, client_zip: clientZip || null, items, subtotal, tax_rate: taxRate, tax_amount: taxAmount, total, notes: notes || null, due_date: dueDate || null, square_payment_link: squarePaymentLink, square_order_id: squareOrderId, receipt_photos: receiptPhotos?.length ? receiptPhotos : null })
     .select().single();
 
   if (dbError) return { statusCode: 502, body: JSON.stringify({ error: 'Failed to save invoice', detail: dbError.message }) };
@@ -249,7 +253,7 @@ exports.handler = async (event) => {
       from: process.env.FROM_EMAIL,
       to: clientEmail,
       subject: `Invoice from ${business?.name || 'Us'} — $${total.toFixed(2)} due`,
-      html: buildEmail({ invoiceNumber, passcode, clientName, business: business || {}, items, subtotal, taxRate, taxAmount, total, dueDate, notes, paymentLink: squarePaymentLink }),
+      html: buildEmail({ invoiceNumber, passcode, clientName, clientAddress, clientCity, clientState, clientZip, business: business || {}, items, subtotal, taxRate, taxAmount, total, dueDate, notes, paymentLink: squarePaymentLink }),
     });
   } catch (err) { console.error('Resend error:', err); }
 

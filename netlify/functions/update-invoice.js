@@ -21,7 +21,7 @@ exports.handler = async (event) => {
   let body;
   try { body = JSON.parse(event.body); } catch { return { statusCode: 400, body: JSON.stringify({ error: 'Invalid JSON' }) }; }
 
-  const { invoiceId, clientName, clientEmail, clientPhone, clientCompany, clientAddress, items, taxRate = 0, notes, dueDate, receiptPhotos, resendEmail, sendSmsNotification } = body;
+  const { invoiceId, clientName, clientEmail, clientPhone, clientCompany, clientAddress, clientCity, clientState, clientZip, items, taxRate = 0, notes, dueDate, receiptPhotos, resendEmail, sendSmsNotification } = body;
   if (!invoiceId || !clientName || !clientEmail || !items?.length) {
     return { statusCode: 400, body: JSON.stringify({ error: 'invoiceId, clientName, clientEmail, and items required' }) };
   }
@@ -78,6 +78,9 @@ exports.handler = async (event) => {
     client_phone: clientPhone || null,
     client_company: clientCompany || null,
     client_address: clientAddress || null,
+    client_city: clientCity || null,
+    client_state: clientState || null,
+    client_zip: clientZip || null,
     items,
     subtotal,
     tax_rate: taxRate,
@@ -103,7 +106,7 @@ exports.handler = async (event) => {
         from: process.env.FROM_EMAIL,
         to: normalizedEmail,
         subject: `Updated Invoice from ${business?.name || 'Us'} — $${total.toFixed(2)} due`,
-        html: buildEmail({ invoiceNumber: existing.invoice_number, passcode, clientName, business: business || {}, items, subtotal, taxRate, taxAmount, total, dueDate, notes, paymentLink: squarePaymentLink }),
+        html: buildEmail({ invoiceNumber: existing.invoice_number, passcode, clientName, clientAddress, clientCity, clientState, clientZip, business: business || {}, items, subtotal, taxRate, taxAmount, total, dueDate, notes, paymentLink: squarePaymentLink }),
       });
     } catch (err) { console.error('Resend error:', err); }
 
@@ -118,7 +121,7 @@ exports.handler = async (event) => {
   return { statusCode: 200, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(invoice) };
 };
 
-function buildEmail({ invoiceNumber, passcode, clientName, business, items, subtotal, taxRate, taxAmount, total, dueDate, notes, paymentLink }) {
+function buildEmail({ invoiceNumber, passcode, clientName, clientAddress, clientCity, clientState, clientZip, business, items, subtotal, taxRate, taxAmount, total, dueDate, notes, paymentLink }) {
   const appUrl = process.env.APP_URL || '';
   const dueDateStr = dueDate ? new Date(dueDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : 'Upon receipt';
 
@@ -166,7 +169,7 @@ function buildEmail({ invoiceNumber, passcode, clientName, business, items, subt
   <tr><td style="padding:28px 40px 0;">
     <table width="100%" cellpadding="0" cellspacing="0"><tr>
       <td style="vertical-align:top;width:33%;"><p style="margin:0 0 6px;color:#6b7280;font-size:11px;text-transform:uppercase;letter-spacing:0.05em;">From</p><div style="font-size:13px;color:#374151;line-height:1.6;">${businessBlock}</div></td>
-      <td style="vertical-align:top;width:33%;padding-left:20px;"><p style="margin:0 0 6px;color:#6b7280;font-size:11px;text-transform:uppercase;letter-spacing:0.05em;">Billed To</p><p style="margin:0;font-size:15px;font-weight:600;color:#111827;">${escHtml(clientName)}</p></td>
+      <td style="vertical-align:top;width:33%;padding-left:20px;"><p style="margin:0 0 6px;color:#6b7280;font-size:11px;text-transform:uppercase;letter-spacing:0.05em;">Billed To</p><div style="font-size:13px;color:#374151;line-height:1.6;"><div style="font-weight:600;font-size:15px;color:#111827;">${escHtml(clientName)}</div>${clientAddress ? `<div>${escHtml(clientAddress)}</div>` : ''}${[clientCity,clientState,clientZip].filter(Boolean).length ? `<div>${escHtml([clientCity,clientState,clientZip].filter(Boolean).join(', '))}</div>` : ''}</div></td>
       <td style="vertical-align:top;width:33%;text-align:right;"><p style="margin:0 0 6px;color:#6b7280;font-size:11px;text-transform:uppercase;letter-spacing:0.05em;">Due Date</p><p style="margin:0;font-size:15px;font-weight:600;color:#111827;">${dueDateStr}</p></td>
     </tr></table>
   </td></tr>

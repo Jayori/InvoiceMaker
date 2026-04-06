@@ -147,7 +147,7 @@ async function loadInvoices() {
         <td style="display:flex;gap:6px;flex-wrap:wrap;">
           ${inv.square_payment_link ? `<a href="${esc(inv.square_payment_link)}" target="_blank" class="btn btn-sm btn-secondary">Link</a>` : ''}
           <button class="btn btn-sm btn-secondary" onclick="editInvoice('${inv.id}')">Edit</button>
-          <button class="btn btn-sm btn-secondary" onclick="saveClientFromRow('${escAttr(inv.client_name)}','${escAttr(inv.client_email)}','${escAttr(inv.client_phone||'')}','${escAttr(inv.client_company||'')}','${escAttr(inv.client_address||'')}')" title="Save client to contacts">+ Client</button>
+          <button class="btn btn-sm btn-secondary" onclick="saveClientFromRow('${escAttr(inv.client_name)}','${escAttr(inv.client_email)}','${escAttr(inv.client_phone||'')}','${escAttr(inv.client_company||'')}','${escAttr(inv.client_address||'')}','${escAttr(inv.client_city||'')}','${escAttr(inv.client_state||'')}','${escAttr(inv.client_zip||'')}')" title="Save client to contacts">+ Client</button>
         </td>
       </tr>`).join('');
     table.style.display = '';
@@ -284,6 +284,9 @@ async function submitInvoice(e) {
     clientPhone: document.getElementById('client-phone').value.trim(),
     clientCompany: document.getElementById('client-company').value.trim(),
     clientAddress: document.getElementById('client-address').value.trim(),
+    clientCity: document.getElementById('client-city').value.trim(),
+    clientState: document.getElementById('client-state').value.trim(),
+    clientZip: document.getElementById('client-zip').value.trim(),
     items,
     taxRate,
     notes: document.getElementById('notes').value.trim(),
@@ -297,7 +300,7 @@ async function submitInvoice(e) {
     fetch('/api/save-client', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: payload.clientName, email: payload.clientEmail, phone: payload.clientPhone, company: payload.clientCompany, address: payload.clientAddress }),
+      body: JSON.stringify({ name: payload.clientName, email: payload.clientEmail, phone: payload.clientPhone, company: payload.clientCompany, address: payload.clientAddress, city: payload.clientCity, state: payload.clientState, zip: payload.clientZip }),
     }).then(() => loadClients()).catch(() => {});
   }
 
@@ -348,7 +351,7 @@ function resetInvoiceForm() {
   document.getElementById('tax-row').style.display = 'none';
   const photoPreview = document.getElementById('invoice-photo-preview');
   if (photoPreview) photoPreview.innerHTML = '';
-  ['client-name','client-email','client-phone','client-company','client-address','notes'].forEach(id => {
+  ['client-name','client-email','client-phone','client-company','client-address','client-city','client-state','client-zip','notes'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.value = '';
   });
@@ -419,13 +422,16 @@ function fillClient(id) {
   document.getElementById('client-phone').value = c.phone || '';
   document.getElementById('client-company').value = c.company || '';
   document.getElementById('client-address').value = c.address || '';
+  document.getElementById('client-city').value = c.city || '';
+  document.getElementById('client-state').value = c.state || '';
+  document.getElementById('client-zip').value = c.zip || '';
 }
 
 function showClientForm() {
   document.getElementById('client-form-wrap').style.display = '';
   document.getElementById('client-form-title').textContent = 'New Client';
   document.getElementById('edit-client-id').value = '';
-  ['cf-name','cf-email','cf-phone','cf-company','cf-address','cf-notes'].forEach(id => {
+  ['cf-name','cf-email','cf-phone','cf-company','cf-address','cf-city','cf-state','cf-zip','cf-notes'].forEach(id => {
     document.getElementById(id).value = '';
   });
 }
@@ -445,6 +451,9 @@ function editClient(id) {
   document.getElementById('cf-phone').value = c.phone || '';
   document.getElementById('cf-company').value = c.company || '';
   document.getElementById('cf-address').value = c.address || '';
+  document.getElementById('cf-city').value = c.city || '';
+  document.getElementById('cf-state').value = c.state || '';
+  document.getElementById('cf-zip').value = c.zip || '';
   document.getElementById('cf-notes').value = c.notes || '';
 }
 
@@ -457,6 +466,9 @@ async function saveClient() {
     phone: document.getElementById('cf-phone').value.trim(),
     company: document.getElementById('cf-company').value.trim(),
     address: document.getElementById('cf-address').value.trim(),
+    city: document.getElementById('cf-city').value.trim(),
+    state: document.getElementById('cf-state').value.trim(),
+    zip: document.getElementById('cf-zip').value.trim(),
     notes: document.getElementById('cf-notes').value.trim(),
   };
   if (!payload.name || !payload.email) { showToast('Name and email are required.', 'error'); return; }
@@ -546,7 +558,7 @@ async function loadEstimates() {
           <button class="btn btn-sm btn-secondary" onclick="openEstimateDetail('${est.id}')">View</button>
           <button class="btn btn-sm btn-secondary" onclick="editEstimate('${est.id}')">Edit</button>
           ${est.status === 'approved' ? `<button class="btn btn-sm btn-primary" onclick="openEstimateDetail('${est.id}')" title="Convert to invoice" style="background:#0f766e;">Invoice →</button>` : ''}
-          <button class="btn btn-sm btn-secondary" onclick="saveClientFromRow('${escAttr(est.client_name)}','${escAttr(est.client_email)}','${escAttr(est.client_phone||'')}','${escAttr(est.client_address||'')}')" title="Save client to contacts">+ Client</button>
+          <button class="btn btn-sm btn-secondary" onclick="saveClientFromRow('${escAttr(est.client_name)}','${escAttr(est.client_email)}','${escAttr(est.client_phone||'')}','${escAttr(est.client_company||'')}','${escAttr(est.client_address||'')}','${escAttr(est.client_city||'')}','${escAttr(est.client_state||'')}','${escAttr(est.client_zip||'')}')" title="Save client to contacts">+ Client</button>
         </td>
       </tr>`;
     }).join('');
@@ -870,16 +882,18 @@ function fillEstimateClient(id) {
   document.getElementById('est-client-phone').value = c.phone || '';
   document.getElementById('est-client-company').value = c.company || '';
   document.getElementById('est-client-address').value = c.address || '';
+  document.getElementById('est-client-city').value = c.city || '';
+  document.getElementById('est-client-state').value = c.state || '';
+  document.getElementById('est-client-zip').value = c.zip || '';
 }
 
-async function saveClientFromRow(name, email, phone, company, address) {
+async function saveClientFromRow(name, email, phone, company, address, city, state, zip) {
   if (!name || !email) { showToast('No client info to save.', 'error'); return; }
   try {
-    // Upsert: check if client exists by email first
     const res = await fetch('/api/save-client', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, email, phone: phone || '', company: company || '', address: address || '' }),
+      body: JSON.stringify({ name, email, phone: phone || '', company: company || '', address: address || '', city: city || '', state: state || '', zip: zip || '' }),
     });
     if (!res.ok) throw new Error('Failed');
     await loadClients();
@@ -905,6 +919,9 @@ async function submitEstimate(e) {
     clientPhone: document.getElementById('est-client-phone').value.trim(),
     clientCompany: document.getElementById('est-client-company').value.trim(),
     clientAddress: document.getElementById('est-client-address').value.trim(),
+    clientCity: document.getElementById('est-client-city').value.trim(),
+    clientState: document.getElementById('est-client-state').value.trim(),
+    clientZip: document.getElementById('est-client-zip').value.trim(),
     items,
     taxRate,
     notes: document.getElementById('est-notes').value.trim(),
@@ -916,7 +933,7 @@ async function submitEstimate(e) {
     fetch('/api/save-client', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: payload.clientName, email: payload.clientEmail, phone: payload.clientPhone, company: payload.clientCompany, address: payload.clientAddress }),
+      body: JSON.stringify({ name: payload.clientName, email: payload.clientEmail, phone: payload.clientPhone, company: payload.clientCompany, address: payload.clientAddress, city: payload.clientCity, state: payload.clientState, zip: payload.clientZip }),
     }).then(() => loadClients()).catch(() => {});
   }
 
@@ -967,7 +984,7 @@ function resetEstimateForm() {
   document.getElementById('est-completion-display').style.display = 'none';
   const photoPreview = document.getElementById('est-photo-preview');
   if (photoPreview) photoPreview.innerHTML = '';
-  ['est-client-name','est-client-email','est-client-phone','est-client-company','est-client-address','est-notes'].forEach(id => {
+  ['est-client-name','est-client-email','est-client-phone','est-client-company','est-client-address','est-client-city','est-client-state','est-client-zip','est-notes'].forEach(id => {
     const el = document.getElementById(id); if (el) el.value = '';
   });
   // Reset edit mode UI
@@ -1024,6 +1041,9 @@ function editInvoice(id) {
   document.getElementById('client-phone').value = inv.client_phone || '';
   document.getElementById('client-company').value = inv.client_company || '';
   document.getElementById('client-address').value = inv.client_address || '';
+  document.getElementById('client-city').value = inv.client_city || '';
+  document.getElementById('client-state').value = inv.client_state || '';
+  document.getElementById('client-zip').value = inv.client_zip || '';
   document.getElementById('due-date').value = inv.due_date ? inv.due_date.split('T')[0] : '';
   document.getElementById('notes').value = inv.notes || '';
 
@@ -1076,6 +1096,9 @@ function editEstimate(id) {
   document.getElementById('est-client-phone').value = est.client_phone || '';
   document.getElementById('est-client-company').value = est.client_company || '';
   document.getElementById('est-client-address').value = est.client_address || '';
+  document.getElementById('est-client-city').value = est.client_city || '';
+  document.getElementById('est-client-state').value = est.client_state || '';
+  document.getElementById('est-client-zip').value = est.client_zip || '';
   document.getElementById('est-notes').value = est.notes || '';
 
   // Prefill tax
