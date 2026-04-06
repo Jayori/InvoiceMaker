@@ -467,9 +467,10 @@ async function loadClients() {
         <td>${esc(c.phone || '—')}</td>
         <td>${esc(c.company || '—')}</td>
         <td><code style="font-size:13px;letter-spacing:0.1em;background:var(--gray-100);padding:2px 6px;border-radius:4px;">${esc(c.passcode || '—')}</code></td>
-        <td style="display:flex;gap:8px;">
+        <td style="display:flex;gap:8px;flex-wrap:wrap;">
           <button class="btn btn-sm btn-secondary" onclick="editClient('${c.id}')">Edit</button>
-          <button class="btn btn-sm btn-danger" onclick="deleteClient('${c.id}')">Delete</button>
+          <button class="btn btn-sm btn-secondary" onclick="regenClientCode('${c.id}', '${escAttr(c.name)}')">New Code</button>
+          <button class="btn btn-sm" style="background:#fee2e2;color:#dc2626;border:none;" onclick="deleteClient('${c.id}')">Delete</button>
         </td>
       </tr>`).join('');
     if (table) table.style.display = '';
@@ -548,7 +549,7 @@ async function saveClient() {
 }
 
 async function deleteClient(id) {
-  if (!confirm('Delete this client?')) return;
+  if (!confirm('Delete this client? This cannot be undone.')) return;
   try {
     await fetch('/api/delete-client', {
       method: 'DELETE',
@@ -556,7 +557,23 @@ async function deleteClient(id) {
       body: JSON.stringify({ id }),
     });
     await loadClients();
+    showToast('Client deleted.', 'success');
   } catch { showToast('Failed to delete.', 'error'); }
+}
+
+async function regenClientCode(id, name) {
+  if (!confirm(`Generate a new access code for ${name}? Their old code will stop working.`)) return;
+  try {
+    const res = await fetch('/api/regen-client-code', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed');
+    await loadClients();
+    showToast(`New code for ${name}: ${data.passcode}`, 'success');
+  } catch { showToast('Failed to regenerate code.', 'error'); }
 }
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
