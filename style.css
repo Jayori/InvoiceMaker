@@ -215,11 +215,99 @@ textarea { resize: vertical; min-height: 80px; }
 .mgr-main { flex: 1; padding: 32px; overflow-y: auto; max-width: 900px; }
 .mgr-tab { }
 
-@media (max-width: 700px) {
-  .mgr-sidebar { width: 60px; min-width: 60px; }
-  .mgr-brand, .mgr-nav-item span, .mgr-logout { display: none; }
-  .mgr-nav-item { justify-content: center; padding: 12px; }
+/* ═══════════════════════════════════════════════════
+   MOBILE — MANAGER & CLIENT
+═══════════════════════════════════════════════════ */
+@media (max-width: 767px) {
+
+  /* ── Manager layout: sidebar becomes bottom nav ── */
+  .mgr-layout { flex-direction: column; }
+
+  .mgr-sidebar {
+    width: 100%; min-width: 0; height: auto;
+    position: fixed; bottom: 0; left: 0; right: 0; z-index: 40;
+    flex-direction: row; padding: 0;
+    border-top: 1px solid rgba(255,255,255,0.12);
+  }
+
+  .mgr-brand { display: none; }
+  .mgr-logout { display: none; }
+
+  .mgr-nav {
+    flex-direction: row; width: 100%; padding: 0; gap: 0;
+  }
+
+  .mgr-nav-item {
+    flex: 1; flex-direction: column; justify-content: center; align-items: center;
+    padding: 6px 2px 8px; font-size: 10px; gap: 3px; border-radius: 0;
+    white-space: nowrap; overflow: hidden;
+  }
+
+  .mgr-nav-item svg { width: 20px; height: 20px; flex-shrink: 0; }
+
+  /* ── Main content: full width, leave room for bottom nav ── */
+  .mgr-main {
+    padding: 16px 12px 90px;
+    max-width: 100%;
+    width: 100%;
+  }
+
+  /* ── Cards ── */
+  .card { padding: 16px; }
+
+  /* ── Section header ── */
+  .section-header { flex-wrap: wrap; gap: 8px; }
+  .section-title { font-size: 18px; }
+
+  /* ── Form grid: single column ── */
   .form-grid { grid-template-columns: 1fr; }
+
+  /* ── Form actions: wrap ── */
+  .form-actions { flex-wrap: wrap; gap: 8px; }
+  .form-actions .btn { flex: 1; justify-content: center; min-width: 120px; }
+
+  /* ── Tables: horizontal scroll ── */
+  .invoice-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .invoice-table { min-width: 600px; }
+  .invoice-table th, .invoice-table td { padding: 10px 10px; }
+
+  /* ── Items table ── */
+  .items-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .items-table { min-width: 520px; }
+
+  /* ── Dashboard estimates table ── */
+  #est-table { min-width: 580px; }
+
+  /* ── Clients table ── */
+  #clients-table { min-width: 500px; }
+
+  /* ── Edit tab ── */
+  #tab-edit .form-actions { flex-direction: column; }
+
+  /* ── PIN modal ── */
+  .pin-card { padding: 32px 20px; margin: 0 16px; }
+
+  /* ── Client page ── */
+  .client-body { padding: 20px 12px; }
+  .client-card { padding: 24px 16px; }
+  .client-biz-name { font-size: 18px; }
+
+  .inv-header { flex-direction: column; gap: 10px; align-items: flex-start; }
+  .inv-total-big { font-size: 24px; }
+  .inv-meta { flex-wrap: wrap; gap: 16px; }
+
+  .inv-items-table { font-size: 13px; }
+  .inv-items-table th, .inv-items-table td { padding: 8px 4px; }
+
+  .est-big-row { flex-direction: column; gap: 12px; }
+  .est-big-right { text-align: left; }
+  .est-big-value { font-size: 22px; }
+
+  .est-actions { flex-direction: column; }
+  .est-btn-approve, .est-btn-reject, .est-btn-question { width: 100%; text-align: center; }
+
+  /* ── Landing page ── */
+  .landing-btn { padding: 16px 40px; font-size: 18px; }
 }
 
 

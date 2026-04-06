@@ -17,8 +17,18 @@ exports.handler = async (event) => {
     delete rest.passcode;
     result = await supabase.from('clients').update(rest).eq('id', id).select().single();
   } else {
-    // New client — assign a permanent passcode
-    rest.passcode = generatePasscode();
+    // New client — reuse existing invoice/estimate passcode if one exists, else generate
+    const normalizedEmail = (rest.email || '').toLowerCase().trim();
+    let existingPasscode = null;
+    if (normalizedEmail) {
+      const { data: inv } = await supabase.from('invoices').select('passcode').eq('client_email', normalizedEmail).not('passcode', 'is', null).order('created_at', { ascending: false }).limit(1).maybeSingle();
+      existingPasscode = inv?.passcode || null;
+      if (!existingPasscode) {
+        const { data: est } = await supabase.from('estimates').select('passcode').eq('client_email', normalizedEmail).not('passcode', 'is', null).order('created_at', { ascending: false }).limit(1).maybeSingle();
+        existingPasscode = est?.passcode || null;
+      }
+    }
+    rest.passcode = existingPasscode || generatePasscode();
     result = await supabase.from('clients').insert(rest).select().single();
   }
 
