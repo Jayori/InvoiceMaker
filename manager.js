@@ -1363,6 +1363,7 @@ async function deleteEstimate(id) {
     if (res.ok) { showToast('Estimate deleted.', 'success'); loadEstimates(); }
     else showToast('Failed to delete.', 'error');
   } catch { showToast('Failed to delete.', 'error'); }
+}
 
 // ─── Photo helpers ────────────────────────────────────────────────────────────
 
