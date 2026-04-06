@@ -15,7 +15,7 @@ exports.handler = async (event) => {
   let body;
   try { body = JSON.parse(event.body); } catch { return { statusCode: 400, body: JSON.stringify({ error: 'Invalid JSON' }) }; }
 
-  const { estimateId, clientName, clientEmail, clientPhone, clientCompany, clientAddress, clientCity, clientState, clientZip, items, taxRate = 0, notes, receiptPhotos, resendEmail, sendSmsNotification } = body;
+  const { estimateId, clientName, clientEmail, clientPhone, clientCompany, clientAddress, clientCity, clientState, clientZip, items, taxRate = 0, notes, receiptPhotos, resendEmail, resendSms } = body;
   if (!estimateId || !clientName || !clientEmail || !items?.length) {
     return { statusCode: 400, body: JSON.stringify({ error: 'estimateId, clientName, clientEmail, and items required' }) };
   }
@@ -73,7 +73,7 @@ exports.handler = async (event) => {
       });
     } catch (err) { console.error('Resend error:', err); }
 
-    if (sendSmsNotification && clientPhone) {
+    if (resendSms && clientPhone) {
       const bizName = business?.name || 'Us';
       const msg = `Updated estimate from ${bizName}: $${total.toFixed(2)}. View & respond at ${appUrl}/client.html — Code: ${passcode}`;
       const smsResult = await sendSms(clientPhone, msg);

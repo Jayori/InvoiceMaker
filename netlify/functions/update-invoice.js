@@ -21,7 +21,7 @@ exports.handler = async (event) => {
   let body;
   try { body = JSON.parse(event.body); } catch { return { statusCode: 400, body: JSON.stringify({ error: 'Invalid JSON' }) }; }
 
-  const { invoiceId, clientName, clientEmail, clientPhone, clientCompany, clientAddress, clientCity, clientState, clientZip, items, taxRate = 0, notes, dueDate, receiptPhotos, resendEmail, sendSmsNotification } = body;
+  const { invoiceId, clientName, clientEmail, clientPhone, clientCompany, clientAddress, clientCity, clientState, clientZip, items, taxRate = 0, notes, dueDate, receiptPhotos, resendEmail, resendSms } = body;
   if (!invoiceId || !clientName || !clientEmail || !items?.length) {
     return { statusCode: 400, body: JSON.stringify({ error: 'invoiceId, clientName, clientEmail, and items required' }) };
   }
@@ -110,7 +110,7 @@ exports.handler = async (event) => {
       });
     } catch (err) { console.error('Resend error:', err); }
 
-    if (sendSmsNotification && clientPhone) {
+    if (resendSms && clientPhone) {
       const appUrl = process.env.APP_URL || '';
       const msg = `Updated invoice from ${business?.name || 'Us'}: $${total.toFixed(2)} due. View & pay at ${appUrl}/client.html — Code: ${passcode}`;
       const smsResult = await sendSms(clientPhone, msg);

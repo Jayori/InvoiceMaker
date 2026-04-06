@@ -206,7 +206,24 @@
                 </div>
                 <div class="form-group">
                   <label for="client-phone">Client Phone</label>
-                  <input type="text" id="client-phone" placeholder="(555) 000-0000">
+                  <div style="display:flex;gap:6px;">
+                    <select id="client-phone-cc" style="width:90px;flex-shrink:0;">
+                      <option value="+1">🇺🇸 +1</option>
+                      <option value="+1-CA">🇨🇦 +1</option>
+                      <option value="+44">🇬🇧 +44</option>
+                      <option value="+52">🇲🇽 +52</option>
+                      <option value="+61">🇦🇺 +61</option>
+                      <option value="+91">🇮🇳 +91</option>
+                      <option value="+49">🇩🇪 +49</option>
+                      <option value="+33">🇫🇷 +33</option>
+                      <option value="+55">🇧🇷 +55</option>
+                      <option value="+34">🇪🇸 +34</option>
+                      <option value="+39">🇮🇹 +39</option>
+                      <option value="+81">🇯🇵 +81</option>
+                      <option value="+86">🇨🇳 +86</option>
+                    </select>
+                    <input type="text" id="client-phone" placeholder="(555) 000-0000" style="flex:1;">
+                  </div>
                 </div>
                 <div class="form-group">
                   <label for="client-company">Company</label>
@@ -303,12 +320,14 @@
 
             <div class="form-actions">
               <button type="button" class="btn btn-secondary" onclick="resetInvoiceForm()">Clear</button>
-              <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px;color:var(--gray-600);">
-                <input type="checkbox" id="inv-send-sms"> Also text client
-              </label>
-              <label id="inv-resend-wrap" style="display:none;align-items:center;gap:8px;cursor:pointer;font-size:14px;color:var(--gray-600);">
-                <input type="checkbox" id="inv-resend" checked> Resend to client
-              </label>
+              <div style="display:flex;gap:14px;align-items:center;">
+                <label id="inv-send-email-wrap" style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:14px;color:var(--gray-600);">
+                  <input type="checkbox" id="inv-send-email" checked> Email client
+                </label>
+                <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:14px;color:var(--gray-600);">
+                  <input type="checkbox" id="inv-send-sms"> Text client
+                </label>
+              </div>
               <button type="submit" class="btn btn-primary" id="submit-btn">Send Invoice & Payment Link</button>
             </div>
           </form>
@@ -425,7 +444,24 @@
                 </div>
                 <div class="form-group">
                   <label>Client Phone</label>
-                  <input type="text" id="est-client-phone" placeholder="(555) 000-0000">
+                  <div style="display:flex;gap:6px;">
+                    <select id="est-client-phone-cc" style="width:90px;flex-shrink:0;">
+                      <option value="+1">🇺🇸 +1</option>
+                      <option value="+1-CA">🇨🇦 +1</option>
+                      <option value="+44">🇬🇧 +44</option>
+                      <option value="+52">🇲🇽 +52</option>
+                      <option value="+61">🇦🇺 +61</option>
+                      <option value="+91">🇮🇳 +91</option>
+                      <option value="+49">🇩🇪 +49</option>
+                      <option value="+33">🇫🇷 +33</option>
+                      <option value="+55">🇧🇷 +55</option>
+                      <option value="+34">🇪🇸 +34</option>
+                      <option value="+39">🇮🇹 +39</option>
+                      <option value="+81">🇯🇵 +81</option>
+                      <option value="+86">🇨🇳 +86</option>
+                    </select>
+                    <input type="text" id="est-client-phone" placeholder="(555) 000-0000" style="flex:1;">
+                  </div>
                 </div>
                 <div class="form-group">
                   <label>Company</label>
@@ -518,12 +554,14 @@
 
             <div class="form-actions">
               <button type="button" class="btn btn-secondary" onclick="resetEstimateForm()">Clear</button>
-              <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px;color:var(--gray-600);">
-                <input type="checkbox" id="est-send-sms"> Also text client
-              </label>
-              <label id="est-resend-wrap" style="display:none;align-items:center;gap:8px;cursor:pointer;font-size:14px;color:var(--gray-600);">
-                <input type="checkbox" id="est-resend" checked> Resend to client
-              </label>
+              <div style="display:flex;gap:14px;align-items:center;">
+                <label id="est-send-email-wrap" style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:14px;color:var(--gray-600);">
+                  <input type="checkbox" id="est-send-email" checked> Email client
+                </label>
+                <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:14px;color:var(--gray-600);">
+                  <input type="checkbox" id="est-send-sms"> Text client
+                </label>
+              </div>
               <button type="submit" class="btn btn-primary" id="est-submit-btn">Send Estimate</button>
             </div>
           </form>

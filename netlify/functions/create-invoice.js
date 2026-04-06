@@ -176,7 +176,7 @@ exports.handler = async (event) => {
   let body;
   try { body = JSON.parse(event.body); } catch { return { statusCode: 400, body: JSON.stringify({ error: 'Invalid JSON' }) }; }
 
-  const { clientName, clientEmail, clientPhone, clientCompany, clientAddress, clientCity, clientState, clientZip, items, taxRate = 0, notes, dueDate, sendSmsNotification, receiptPhotos } = body;
+  const { clientName, clientEmail, clientPhone, clientCompany, clientAddress, clientCity, clientState, clientZip, items, taxRate = 0, notes, dueDate, sendEmail = true, sendSmsNotification, receiptPhotos } = body;
   if (!clientName || !clientEmail || !items?.length) {
     return { statusCode: 400, body: JSON.stringify({ error: 'clientName, clientEmail, and at least one item are required' }) };
   }
@@ -247,15 +247,17 @@ exports.handler = async (event) => {
 
   if (dbError) return { statusCode: 502, body: JSON.stringify({ error: 'Failed to save invoice', detail: dbError.message }) };
 
-  // Send email
-  try {
-    await resend.emails.send({
-      from: process.env.FROM_EMAIL,
-      to: clientEmail,
-      subject: `Invoice from ${business?.name || 'Us'} — $${total.toFixed(2)} due`,
-      html: buildEmail({ invoiceNumber, passcode, clientName, clientAddress, clientCity, clientState, clientZip, business: business || {}, items, subtotal, taxRate, taxAmount, total, dueDate, notes, paymentLink: squarePaymentLink }),
-    });
-  } catch (err) { console.error('Resend error:', err); }
+  // Send email if requested
+  if (sendEmail) {
+    try {
+      await resend.emails.send({
+        from: process.env.FROM_EMAIL,
+        to: clientEmail,
+        subject: `Invoice from ${business?.name || 'Us'} — $${total.toFixed(2)} due`,
+        html: buildEmail({ invoiceNumber, passcode, clientName, clientAddress, clientCity, clientState, clientZip, business: business || {}, items, subtotal, taxRate, taxAmount, total, dueDate, notes, paymentLink: squarePaymentLink }),
+      });
+    } catch (err) { console.error('Resend error:', err); }
+  }
 
   // Send SMS if requested and phone provided
   if (sendSmsNotification && clientPhone) {

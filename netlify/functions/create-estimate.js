@@ -24,7 +24,7 @@ exports.handler = async (event) => {
   let body;
   try { body = JSON.parse(event.body); } catch { return { statusCode: 400, body: JSON.stringify({ error: 'Invalid JSON' }) }; }
 
-  const { clientName, clientEmail, clientPhone, clientCompany, clientAddress, clientCity, clientState, clientZip, items, taxRate = 0, notes, sendSmsNotification, receiptPhotos } = body;
+  const { clientName, clientEmail, clientPhone, clientCompany, clientAddress, clientCity, clientState, clientZip, items, taxRate = 0, notes, sendEmail = true, sendSmsNotification, receiptPhotos } = body;
   if (!clientName || !clientEmail || !items?.length) {
     return { statusCode: 400, body: JSON.stringify({ error: 'clientName, clientEmail, and items required' }) };
   }
@@ -89,14 +89,16 @@ exports.handler = async (event) => {
   const { data: business = {} } = await supabase.from('business_profile').select('*').eq('id', 1).single();
   const appUrl = process.env.APP_URL || '';
 
-  try {
-    await resend.emails.send({
-      from: process.env.FROM_EMAIL,
-      to: clientEmail,
-      subject: `Estimate from ${business?.name || 'Us'} — $${total.toFixed(2)}`,
-      html: buildEstimateEmail({ estimate, passcode, business: business || {}, appUrl }),
-    });
-  } catch (err) { console.error('Resend error:', err); }
+  if (sendEmail) {
+    try {
+      await resend.emails.send({
+        from: process.env.FROM_EMAIL,
+        to: clientEmail,
+        subject: `Estimate from ${business?.name || 'Us'} — $${total.toFixed(2)}`,
+        html: buildEstimateEmail({ estimate, passcode, business: business || {}, appUrl }),
+      });
+    } catch (err) { console.error('Resend error:', err); }
+  }
 
   // Send SMS if requested and phone provided
   if (sendSmsNotification && clientPhone) {

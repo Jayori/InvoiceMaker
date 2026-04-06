@@ -6,8 +6,9 @@ async function sendSms(phone, message) {
   const key = process.env.TEXTBELT_API_KEY;
   if (!key || !phone) return { success: false, error: 'No API key or phone' };
 
-  // Strip non-digits, keep + prefix if present
-  const cleaned = phone.replace(/[^\d+]/g, '');
+  // Strip non-digits, add +1 for 10-digit US numbers
+  let cleaned = phone.replace(/[^\d+]/g, '');
+  if (!cleaned.startsWith('+') && cleaned.replace(/\D/g, '').length === 10) cleaned = '+1' + cleaned;
   if (cleaned.replace(/\D/g, '').length < 10) return { success: false, error: 'Invalid phone number' };
 
   try {

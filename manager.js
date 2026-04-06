@@ -1,3 +1,13 @@
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function buildPhone(ccId, phoneId) {
+  const raw = document.getElementById(phoneId).value.trim();
+  if (!raw) return '';
+  const cc = (document.getElementById(ccId)?.value || '+1').replace('-CA', ''); // +1-CA → +1
+  const digits = raw.replace(/\D/g, '');
+  return cc + digits;
+}
+
 // ─── Auth ─────────────────────────────────────────────────────────────────────
 
 async function verifyPin(e) {
@@ -281,7 +291,7 @@ async function submitInvoice(e) {
   const payload = {
     clientName: document.getElementById('client-name').value.trim(),
     clientEmail: document.getElementById('client-email').value.trim(),
-    clientPhone: document.getElementById('client-phone').value.trim(),
+    clientPhone: buildPhone('client-phone-cc', 'client-phone'),
     clientCompany: document.getElementById('client-company').value.trim(),
     clientAddress: document.getElementById('client-address').value.trim(),
     clientCity: document.getElementById('client-city').value.trim(),
@@ -291,6 +301,7 @@ async function submitInvoice(e) {
     taxRate,
     notes: document.getElementById('notes').value.trim(),
     dueDate: document.getElementById('due-date').value || null,
+    sendEmail: document.getElementById('inv-send-email').checked,
     sendSmsNotification: document.getElementById('inv-send-sms').checked,
     receiptPhotos,
   };
@@ -313,7 +324,8 @@ async function submitInvoice(e) {
     const url = isEdit ? '/api/update-invoice' : '/api/create-invoice';
     if (isEdit) {
       payload.invoiceId = currentEditInvoiceId;
-      payload.resendEmail = document.getElementById('inv-resend').checked;
+      payload.resendEmail = document.getElementById('inv-send-email').checked;
+      payload.resendSms = document.getElementById('inv-send-sms').checked;
     }
     const res = await fetch(url, {
       method: 'POST',
@@ -916,7 +928,7 @@ async function submitEstimate(e) {
   const payload = {
     clientName: document.getElementById('est-client-name').value.trim(),
     clientEmail: document.getElementById('est-client-email').value.trim(),
-    clientPhone: document.getElementById('est-client-phone').value.trim(),
+    clientPhone: buildPhone('est-client-phone-cc', 'est-client-phone'),
     clientCompany: document.getElementById('est-client-company').value.trim(),
     clientAddress: document.getElementById('est-client-address').value.trim(),
     clientCity: document.getElementById('est-client-city').value.trim(),
@@ -925,6 +937,7 @@ async function submitEstimate(e) {
     items,
     taxRate,
     notes: document.getElementById('est-notes').value.trim(),
+    sendEmail: document.getElementById('est-send-email').checked,
     sendSmsNotification: document.getElementById('est-send-sms').checked,
     receiptPhotos,
   };
@@ -946,7 +959,8 @@ async function submitEstimate(e) {
     const url = isEdit ? '/api/update-estimate' : '/api/create-estimate';
     if (isEdit) {
       payload.estimateId = currentEditEstimateId;
-      payload.resendEmail = document.getElementById('est-resend').checked;
+      payload.resendEmail = document.getElementById('est-send-email').checked;
+      payload.resendSms = document.getElementById('est-send-sms').checked;
     }
     const res = await fetch(url, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
