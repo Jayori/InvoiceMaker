@@ -579,6 +579,51 @@ async function regenClientCode(id, name) {
   } catch { showToast('Failed to regenerate code.', 'error'); }
 }
 
+// ─── Photo Lightbox ────────────────────────────────────────────────────────────
+
+let _lbPhotos = [], _lbIdx = 0;
+
+function openPhotoLightbox(photos, index) {
+  _lbPhotos = Array.isArray(photos) ? photos : [photos];
+  _lbIdx = index || 0;
+  _renderLightbox();
+  document.getElementById('photo-lightbox').classList.add('is-open');
+  document.body.style.overflow = 'hidden';
+}
+
+function _renderLightbox() {
+  document.getElementById('lightbox-img').src = _lbPhotos[_lbIdx];
+  const multi = _lbPhotos.length > 1;
+  document.getElementById('lightbox-prev').style.display = multi ? '' : 'none';
+  document.getElementById('lightbox-next').style.display = multi ? '' : 'none';
+  const counter = document.getElementById('lightbox-counter');
+  counter.textContent = multi ? `${_lbIdx + 1} / ${_lbPhotos.length}` : '';
+  counter.style.display = multi ? '' : 'none';
+}
+
+function lightboxNav(dir) {
+  _lbIdx = (_lbIdx + dir + _lbPhotos.length) % _lbPhotos.length;
+  _renderLightbox();
+}
+
+function closeLightbox() {
+  document.getElementById('photo-lightbox').classList.remove('is-open');
+  document.getElementById('lightbox-img').src = '';
+  document.body.style.overflow = '';
+}
+
+function handleLightboxClick(e) {
+  if (e.target === document.getElementById('photo-lightbox')) closeLightbox();
+}
+
+document.addEventListener('keydown', e => {
+  const lb = document.getElementById('photo-lightbox');
+  if (!lb?.classList.contains('is-open')) return;
+  if (e.key === 'Escape') closeLightbox();
+  if (e.key === 'ArrowLeft') lightboxNav(-1);
+  if (e.key === 'ArrowRight') lightboxNav(1);
+});
+
 // ─── Invoice Preview Modal ─────────────────────────────────────────────────────
 
 function previewInvoice(id) {
@@ -650,9 +695,10 @@ function previewInvoice(id) {
 
   // Photos
   const photos = inv.receipt_photos || [];
+  window._previewPhotos = photos;
   const photosHtml = photos.length
     ? `<div style="margin-top:16px;"><div class="inv-label" style="margin-bottom:8px;">Photos</div>
-       <div class="receipt-photos-wrap">${photos.map(p => `<img src="${esc(p)}" class="receipt-thumb" onclick="window.open('${esc(p)}','_blank')">`).join('')}</div></div>`
+       <div class="receipt-photos-wrap">${photos.map((p, i) => `<img src="${esc(p)}" class="receipt-thumb" onclick="openPhotoLightbox(window._previewPhotos,${i})">`).join('')}</div></div>`
     : '';
 
   document.getElementById('inv-preview-body').innerHTML = `

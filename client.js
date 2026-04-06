@@ -172,7 +172,8 @@ function renderInvoiceDetails(inv, justPaid) {
     const photos = inv.receipt_photos || [];
     if (photos.length) {
       photosSection.style.display = '';
-      photosSection.innerHTML = `<div class="inv-label" style="margin-bottom:8px;">Photos</div><div class="receipt-photos-wrap">${photos.map(p => `<img src="${esc(p)}" class="receipt-thumb" onclick="window.open('${esc(p)}','_blank')">`).join('')}</div>`;
+      window._invPhotos = photos;
+      photosSection.innerHTML = `<div class="inv-label" style="margin-bottom:8px;">Photos</div><div class="receipt-photos-wrap">${photos.map((p, i) => `<img src="${esc(p)}" class="receipt-thumb" onclick="openPhotoLightbox(window._invPhotos,${i})">`).join('')}</div>`;
     } else {
       photosSection.style.display = 'none';
     }
@@ -270,6 +271,10 @@ function renderEstimates(estimates) {
   const list = document.getElementById('estimates-list');
   if (!section || !estimates.length) { if (section) section.style.display = 'none'; return; }
 
+  // Store photo arrays by estimate ID for lightbox access
+  window._estPhotosMap = {};
+  estimates.forEach(est => { if (est.receipt_photos?.length) window._estPhotosMap[est.id] = est.receipt_photos; });
+
   section.style.display = '';
   list.innerHTML = estimates.map(est => {
     const completion = est.estimated_completion_date
@@ -338,7 +343,7 @@ function renderEstimates(estimates) {
 
         ${est.notes ? `<div class="est-notes">${esc(est.notes)}</div>` : ''}
 
-        ${(est.receipt_photos?.length) ? `<div style="margin-bottom:12px;"><div class="est-big-label" style="margin-bottom:6px;">Photos</div><div class="receipt-photos-wrap">${(est.receipt_photos || []).map(p => `<img src="${esc(p)}" class="receipt-thumb" onclick="window.open('${esc(p)}','_blank')">`).join('')}</div></div>` : ''}
+        ${(est.receipt_photos?.length) ? `<div style="margin-bottom:12px;"><div class="est-big-label" style="margin-bottom:6px;">Photos</div><div class="receipt-photos-wrap">${(est.receipt_photos || []).map((p, i) => `<img src="${esc(p)}" class="receipt-thumb" onclick="openPhotoLightbox(window._estPhotosMap['${est.id}'],${i})">`).join('')}</div></div>` : ''}
 
         ${isPending ? `
         <div class="est-actions">
@@ -437,3 +442,48 @@ function esc(str) {
   d.textContent = str || '';
   return d.innerHTML;
 }
+
+// ── Photo Lightbox ────────────────────────────────────────────────────────────
+
+let _lbPhotos = [], _lbIdx = 0;
+
+function openPhotoLightbox(photos, index) {
+  _lbPhotos = Array.isArray(photos) ? photos : [photos];
+  _lbIdx = index || 0;
+  _renderLightbox();
+  document.getElementById('photo-lightbox').classList.add('is-open');
+  document.body.style.overflow = 'hidden';
+}
+
+function _renderLightbox() {
+  document.getElementById('lightbox-img').src = _lbPhotos[_lbIdx];
+  const multi = _lbPhotos.length > 1;
+  document.getElementById('lightbox-prev').style.display = multi ? '' : 'none';
+  document.getElementById('lightbox-next').style.display = multi ? '' : 'none';
+  const counter = document.getElementById('lightbox-counter');
+  counter.textContent = multi ? `${_lbIdx + 1} / ${_lbPhotos.length}` : '';
+  counter.style.display = multi ? '' : 'none';
+}
+
+function lightboxNav(dir) {
+  _lbIdx = (_lbIdx + dir + _lbPhotos.length) % _lbPhotos.length;
+  _renderLightbox();
+}
+
+function closeLightbox() {
+  document.getElementById('photo-lightbox').classList.remove('is-open');
+  document.getElementById('lightbox-img').src = '';
+  document.body.style.overflow = '';
+}
+
+function handleLightboxClick(e) {
+  if (e.target === document.getElementById('photo-lightbox')) closeLightbox();
+}
+
+document.addEventListener('keydown', e => {
+  const lb = document.getElementById('photo-lightbox');
+  if (!lb?.classList.contains('is-open')) return;
+  if (e.key === 'Escape') closeLightbox();
+  if (e.key === 'ArrowLeft') lightboxNav(-1);
+  if (e.key === 'ArrowRight') lightboxNav(1);
+});
