@@ -63,9 +63,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
 function showTab(name, link) {
   document.querySelectorAll('.mgr-tab').forEach(t => t.style.display = 'none');
-  document.querySelectorAll('.mgr-nav-item').forEach(a => a.classList.remove('active'));
+  document.querySelectorAll('.mgr-nav-item, .mobile-nav-item').forEach(a => a.classList.remove('active'));
   document.getElementById(`tab-${name}`).style.display = '';
   if (link) link.classList.add('active');
+  // Sync the other nav (desktop ↔ mobile)
+  const allNav = document.querySelectorAll('.mgr-nav-item, .mobile-nav-item');
+  allNav.forEach(a => { if (a.getAttribute('onclick')?.includes(`'${name}'`)) a.classList.add('active'); });
   if (name === 'dashboard') { loadInvoices(); loadEstimates(); }
   if (name === 'clients') loadClients();
   if (name === 'settings') loadBusinessProfiles();

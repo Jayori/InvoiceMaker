@@ -216,38 +216,42 @@ textarea { resize: vertical; min-height: 80px; }
 .mgr-tab { }
 
 /* ═══════════════════════════════════════════════════
+   MOBILE BOTTOM NAV (separate element, always hidden on desktop)
+═══════════════════════════════════════════════════ */
+.mobile-bottom-nav { display: none; }
+
+/* ═══════════════════════════════════════════════════
    MOBILE — MANAGER & CLIENT
 ═══════════════════════════════════════════════════ */
 @media (max-width: 767px) {
 
-  /* ── Manager layout: sidebar becomes bottom nav ── */
-  .mgr-layout { flex-direction: column; }
+  /* ── Hide desktop sidebar, show mobile bottom nav ── */
+  .mgr-sidebar { display: none; }
 
-  .mgr-sidebar {
-    width: 100%; min-width: 0; height: auto;
-    position: fixed; bottom: 0; left: 0; right: 0; z-index: 40;
-    flex-direction: row; padding: 0;
+  .mobile-bottom-nav {
+    display: flex;
+    position: fixed; bottom: 0; left: 0; right: 0; z-index: 100;
+    background: #0f172a;
     border-top: 1px solid rgba(255,255,255,0.12);
+    height: 60px;
   }
 
-  .mgr-brand { display: none; }
-  .mgr-logout { display: none; }
-
-  .mgr-nav {
-    flex-direction: row; width: 100%; padding: 0; gap: 0;
+  .mobile-nav-item {
+    flex: 1; display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 3px; padding: 6px 2px;
+    color: #94a3b8; font-size: 10px; font-weight: 500;
+    text-decoration: none; border-radius: 0;
+    transition: color 0.15s, background 0.15s;
+    -webkit-tap-highlight-color: transparent;
   }
+  .mobile-nav-item:active { background: rgba(255,255,255,0.08); }
+  .mobile-nav-item.active { color: #93c5fd; }
+  .mobile-nav-item span { line-height: 1; }
 
-  .mgr-nav-item {
-    flex: 1; flex-direction: column; justify-content: center; align-items: center;
-    padding: 6px 2px 8px; font-size: 10px; gap: 3px; border-radius: 0;
-    white-space: nowrap; overflow: hidden;
-  }
-
-  .mgr-nav-item svg { width: 20px; height: 20px; flex-shrink: 0; }
-
-  /* ── Main content: full width, leave room for bottom nav ── */
+  /* ── Main content ── */
   .mgr-main {
-    padding: 16px 12px 90px;
+    padding: 16px 12px 76px;
     max-width: 100%;
     width: 100%;
   }
@@ -270,16 +274,9 @@ textarea { resize: vertical; min-height: 80px; }
   .invoice-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
   .invoice-table { min-width: 600px; }
   .invoice-table th, .invoice-table td { padding: 10px 10px; }
-
-  /* ── Items table ── */
   .items-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
   .items-table { min-width: 520px; }
-
-  /* ── Dashboard estimates table ── */
   #est-table { min-width: 580px; }
-
-  /* ── Clients table ── */
-  #clients-table { min-width: 500px; }
 
   /* ── Edit tab ── */
   #tab-edit .form-actions { flex-direction: column; }
@@ -291,18 +288,14 @@ textarea { resize: vertical; min-height: 80px; }
   .client-body { padding: 20px 12px; }
   .client-card { padding: 24px 16px; }
   .client-biz-name { font-size: 18px; }
-
   .inv-header { flex-direction: column; gap: 10px; align-items: flex-start; }
   .inv-total-big { font-size: 24px; }
   .inv-meta { flex-wrap: wrap; gap: 16px; }
-
   .inv-items-table { font-size: 13px; }
   .inv-items-table th, .inv-items-table td { padding: 8px 4px; }
-
   .est-big-row { flex-direction: column; gap: 12px; }
   .est-big-right { text-align: left; }
   .est-big-value { font-size: 22px; }
-
   .est-actions { flex-direction: column; }
   .est-btn-approve, .est-btn-reject, .est-btn-question { width: 100%; text-align: center; }
 
