@@ -227,6 +227,7 @@ async function loadInvoices() {
         <td style="display:flex;gap:6px;flex-wrap:wrap;">
           ${inv.square_payment_link ? `<a href="${esc(inv.square_payment_link)}" target="_blank" class="btn btn-sm btn-secondary">Link</a>` : ''}
           <button class="btn btn-sm btn-secondary" onclick="editInvoice('${inv.id}')">Edit</button>
+          <button class="btn btn-sm" style="background:#fee2e2;color:#dc2626;border:none;" onclick="deleteInvoice('${inv.id}')">Delete</button>
           <button class="btn btn-sm btn-secondary" onclick="saveClientFromRow('${escAttr(inv.client_name)}','${escAttr(inv.client_email)}','${escAttr(inv.client_phone||'')}','${escAttr(inv.client_company||'')}','${escAttr(inv.client_address||'')}','${escAttr(inv.client_city||'')}','${escAttr(inv.client_state||'')}','${escAttr(inv.client_zip||'')}')" title="Save client to contacts">+ Client</button>
         </td>
       </tr>`).join('');
@@ -389,16 +390,8 @@ async function submitInvoice(e) {
   const btn = document.getElementById('submit-btn');
   btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Sending...';
 
-  const isEdit = !!currentEditInvoiceId;
-
   try {
-    const url = isEdit ? '/api/update-invoice' : '/api/create-invoice';
-    if (isEdit) {
-      payload.invoiceId = currentEditInvoiceId;
-      payload.resendEmail = document.getElementById('inv-send-email').checked;
-      payload.resendSms = document.getElementById('inv-send-sms').checked;
-    }
-    const res = await fetch(url, {
+    const res = await fetch('/api/create-invoice', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
@@ -407,13 +400,8 @@ async function submitInvoice(e) {
     if (!res.ok) throw new Error(`${data.error || 'Failed'}${data.detail ? ': ' + data.detail : ''}`);
 
     const successEl = document.getElementById('invoice-success');
-    if (isEdit) {
-      document.getElementById('success-detail').textContent =
-        `${data.invoice_number} updated${payload.resendEmail ? ' and resent to ' + payload.clientEmail : ''}.`;
-    } else {
-      document.getElementById('success-detail').textContent =
-        `${data.invoice_number} sent to ${payload.clientEmail}. Client passcode: ${data.passcode}`;
-    }
+    document.getElementById('success-detail').textContent =
+      `${data.invoice_number} sent to ${payload.clientEmail}. Client passcode: ${data.passcode}`;
     successEl.style.display = '';
     resetInvoiceForm();
     loadInvoices();
@@ -421,7 +409,7 @@ async function submitInvoice(e) {
   } catch (err) {
     showToast(err.message, 'error');
   } finally {
-    btn.disabled = false; btn.innerHTML = isEdit ? 'Update Invoice' : 'Send Invoice & Payment Link';
+    btn.disabled = false; btn.innerHTML = 'Send Invoice & Payment Link';
   }
 }
 
@@ -438,15 +426,6 @@ function resetInvoiceForm() {
     const el = document.getElementById(id);
     if (el) el.value = '';
   });
-  // Reset edit mode UI
-  const banner = document.getElementById('inv-edit-banner');
-  if (banner) banner.style.display = 'none';
-  const resendWrap = document.getElementById('inv-resend-wrap');
-  if (resendWrap) resendWrap.style.display = 'none';
-  const title = document.getElementById('invoice-form-title');
-  if (title) title.textContent = 'New Invoice';
-  const btn = document.getElementById('submit-btn');
-  if (btn) btn.textContent = 'Send Invoice & Payment Link';
   recalcTotals();
   addItem();
 }
@@ -640,6 +619,7 @@ async function loadEstimates() {
         <td style="display:flex;gap:6px;flex-wrap:wrap;">
           <button class="btn btn-sm btn-secondary" onclick="openEstimateDetail('${est.id}')">View</button>
           <button class="btn btn-sm btn-secondary" onclick="editEstimate('${est.id}')">Edit</button>
+          <button class="btn btn-sm" style="background:#fee2e2;color:#dc2626;border:none;" onclick="deleteEstimate('${est.id}')">Delete</button>
           ${est.status === 'approved' ? `<button class="btn btn-sm btn-primary" onclick="openEstimateDetail('${est.id}')" title="Convert to invoice" style="background:#0f766e;">Invoice →</button>` : ''}
           <button class="btn btn-sm btn-secondary" onclick="saveClientFromRow('${escAttr(est.client_name)}','${escAttr(est.client_email)}','${escAttr(est.client_phone||'')}','${escAttr(est.client_company||'')}','${escAttr(est.client_address||'')}','${escAttr(est.client_city||'')}','${escAttr(est.client_state||'')}','${escAttr(est.client_zip||'')}')" title="Save client to contacts">+ Client</button>
         </td>
@@ -1025,17 +1005,8 @@ async function submitEstimate(e) {
   const btn = document.getElementById('est-submit-btn');
   btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Sending...';
 
-  const isEdit = !!currentEditEstimateId;
-
   try {
-    const url = isEdit ? '/api/update-estimate' : '/api/create-estimate';
-    if (isEdit) {
-      payload.estimateId = currentEditEstimateId;
-      payload.resendEmail = document.getElementById('est-send-email').checked;
-      payload.resendSms = document.getElementById('est-send-sms').checked;
-      payload.businessProfileId = document.getElementById('est-business-select').value || null;
-    }
-    const res = await fetch(url, {
+    const res = await fetch('/api/create-estimate', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     });
@@ -1043,13 +1014,8 @@ async function submitEstimate(e) {
     if (!res.ok) throw new Error(`${data.error || 'Failed'}${data.detail ? ': ' + data.detail : ''}`);
 
     const successEl = document.getElementById('est-success');
-    if (isEdit) {
-      document.getElementById('est-success-detail').textContent =
-        `${data.estimate_number} updated${payload.resendEmail ? ' and resent to ' + payload.clientEmail : ''}.`;
-    } else {
-      document.getElementById('est-success-detail').textContent =
-        `${data.estimate_number} sent to ${payload.clientEmail}. Client access code: ${data.passcode}`;
-    }
+    document.getElementById('est-success-detail').textContent =
+      `${data.estimate_number} sent to ${payload.clientEmail}. Client access code: ${data.passcode}`;
     successEl.style.display = '';
     resetEstimateForm();
     loadEstimates();
@@ -1057,7 +1023,7 @@ async function submitEstimate(e) {
   } catch (err) {
     showToast(err.message, 'error');
   } finally {
-    btn.disabled = false; btn.innerHTML = isEdit ? 'Update Estimate' : 'Send Estimate';
+    btn.disabled = false; btn.innerHTML = 'Send Estimate';
   }
 }
 
@@ -1074,15 +1040,6 @@ function resetEstimateForm() {
   ['est-client-name','est-client-email','est-client-phone','est-client-company','est-client-address','est-client-city','est-client-state','est-client-zip','est-notes'].forEach(id => {
     const el = document.getElementById(id); if (el) el.value = '';
   });
-  // Reset edit mode UI
-  const banner = document.getElementById('est-edit-banner');
-  if (banner) banner.style.display = 'none';
-  const resendWrap = document.getElementById('est-resend-wrap');
-  if (resendWrap) resendWrap.style.display = 'none';
-  const title = document.getElementById('estimate-form-title');
-  if (title) title.textContent = 'New Estimate';
-  const btn = document.getElementById('est-submit-btn');
-  if (btn) btn.textContent = 'Send Estimate';
   recalcEstimateTotals();
   addEstimateItem();
 }
@@ -1095,119 +1052,317 @@ function populateEstimateClientDropdown() {
     clientsCache.map(c => `<option value="${c.id}">${esc(c.name)}${c.company ? ` (${esc(c.company)})` : ''}</option>`).join('');
 }
 
-// ─── Edit Invoice / Estimate ──────────────────────────────────────────────────
+// ─── Dedicated Edit Tab ───────────────────────────────────────────────────────
 
 let currentEditInvoiceId = null;
 let currentEditEstimateId = null;
+let editItemId = 0;
+let editEstItemId = 0;
+
+function openEditTab() {
+  document.querySelectorAll('.mgr-tab').forEach(t => t.style.display = 'none');
+  document.querySelectorAll('.mgr-nav-item').forEach(a => a.classList.remove('active'));
+  document.getElementById('tab-edit').style.display = '';
+  // Populate business dropdown in edit tab
+  const sel = document.getElementById('edit-business-select');
+  const opts = businessProfilesCache.map(p => `<option value="${p.id}">${p.nickname || p.name}</option>`).join('');
+  sel.innerHTML = '<option value="">— Select a business profile —</option>' + opts;
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function discardEdit() {
+  currentEditInvoiceId = null;
+  currentEditEstimateId = null;
+  document.getElementById('tab-edit').style.display = 'none';
+  document.getElementById('tab-dashboard').style.display = '';
+  const dashLink = document.querySelector('.mgr-nav-item');
+  if (dashLink) dashLink.classList.add('active');
+}
 
 function editInvoice(id) {
   const inv = invoicesCache.find(i => i.id === id);
   if (!inv) { showToast('Invoice not found.', 'error'); return; }
-
   currentEditInvoiceId = id;
+  currentEditEstimateId = null;
 
-  // Switch to new-invoice tab
-  document.querySelectorAll('.mgr-tab').forEach(t => t.style.display = 'none');
-  document.querySelectorAll('.mgr-nav-item').forEach(a => a.classList.remove('active'));
-  document.getElementById('tab-new-invoice').style.display = '';
-  const navLink = Array.from(document.querySelectorAll('.mgr-nav-item')).find(l => l.getAttribute('onclick')?.includes('new-invoice'));
-  if (navLink) navLink.classList.add('active');
+  document.getElementById('edit-banner-title').textContent = `Editing Invoice — ${inv.invoice_number}`;
+  document.getElementById('edit-invoice-section').style.display = '';
+  document.getElementById('edit-estimate-section').style.display = 'none';
+  document.getElementById('edit-submit-btn').textContent = 'Save Invoice Changes';
 
-  // Show edit banner
-  const banner = document.getElementById('inv-edit-banner');
-  banner.style.display = 'flex';
-  document.getElementById('inv-edit-number').textContent = inv.invoice_number;
-  document.getElementById('invoice-form-title').textContent = 'Edit Invoice';
-  document.getElementById('submit-btn').textContent = 'Update Invoice';
-  const resendWrap = document.getElementById('inv-resend-wrap');
-  resendWrap.style.display = 'flex';
+  // Client fields
+  document.getElementById('edit-client-name').value = inv.client_name || '';
+  document.getElementById('edit-client-email').value = inv.client_email || '';
+  document.getElementById('edit-client-phone').value = inv.client_phone || '';
+  document.getElementById('edit-client-company').value = inv.client_company || '';
+  document.getElementById('edit-client-address').value = inv.client_address || '';
+  document.getElementById('edit-client-city').value = inv.client_city || '';
+  document.getElementById('edit-client-state').value = inv.client_state || '';
+  document.getElementById('edit-client-zip').value = inv.client_zip || '';
+  document.getElementById('edit-due-date').value = inv.due_date ? inv.due_date.split('T')[0] : '';
+  document.getElementById('edit-notes').value = inv.notes || '';
 
-  // Prefill client info
-  document.getElementById('client-name').value = inv.client_name || '';
-  document.getElementById('client-email').value = inv.client_email || '';
-  document.getElementById('client-phone').value = inv.client_phone || '';
-  document.getElementById('client-company').value = inv.client_company || '';
-  document.getElementById('client-address').value = inv.client_address || '';
-  document.getElementById('client-city').value = inv.client_city || '';
-  document.getElementById('client-state').value = inv.client_state || '';
-  document.getElementById('client-zip').value = inv.client_zip || '';
-  document.getElementById('due-date').value = inv.due_date ? inv.due_date.split('T')[0] : '';
-  document.getElementById('notes').value = inv.notes || '';
-
-  // Prefill tax
+  // Tax
   const useTax = inv.tax_rate > 0;
-  document.getElementById('tax-toggle').checked = useTax;
-  document.getElementById('tax-input-wrap').style.display = useTax ? 'flex' : 'none';
-  if (useTax) document.getElementById('tax-rate').value = inv.tax_rate;
+  document.getElementById('edit-tax-toggle').checked = useTax;
+  document.getElementById('edit-tax-input-wrap').style.display = useTax ? 'flex' : 'none';
+  if (useTax) document.getElementById('edit-tax-rate').value = inv.tax_rate;
 
-  // Prefill line items
-  document.getElementById('items-tbody').innerHTML = '';
-  itemId = 0;
-  (inv.items || []).forEach(item => {
-    addItem(item.description, item.type || 'item', item.quantity, item.unitPrice, item.discount || '', item.workDate || '');
-  });
-  recalcTotals();
+  // Line items
+  document.getElementById('edit-items-tbody').innerHTML = '';
+  editItemId = 0;
+  (inv.items || []).forEach(item => addEditItem(item.description, item.type || 'item', item.quantity, item.unitPrice, item.discount || '', item.workDate || ''));
+  recalcEditTotals();
 
-  window.scrollTo({ top: 0, behavior: 'smooth' });
-}
-
-function cancelInvoiceEdit() {
-  resetInvoiceForm();
+  openEditTab();
+  if (inv.business_profile_id) document.getElementById('edit-business-select').value = inv.business_profile_id;
 }
 
 function editEstimate(id) {
   const est = estimatesCache.find(e => e.id === id);
   if (!est) { showToast('Estimate not found.', 'error'); return; }
-
   currentEditEstimateId = id;
+  currentEditInvoiceId = null;
 
-  // Switch to new-estimate tab
-  document.querySelectorAll('.mgr-tab').forEach(t => t.style.display = 'none');
-  document.querySelectorAll('.mgr-nav-item').forEach(a => a.classList.remove('active'));
-  document.getElementById('tab-new-estimate').style.display = '';
-  const navLink = Array.from(document.querySelectorAll('.mgr-nav-item')).find(l => l.getAttribute('onclick')?.includes('new-estimate'));
-  if (navLink) navLink.classList.add('active');
+  document.getElementById('edit-banner-title').textContent = `Editing Estimate — ${est.estimate_number}`;
+  document.getElementById('edit-invoice-section').style.display = 'none';
+  document.getElementById('edit-estimate-section').style.display = '';
+  document.getElementById('edit-submit-btn').textContent = 'Save Estimate Changes';
 
-  // Show edit banner
-  const banner = document.getElementById('est-edit-banner');
-  banner.style.display = 'flex';
-  document.getElementById('est-edit-number').textContent = est.estimate_number;
-  document.getElementById('estimate-form-title').textContent = 'Edit Estimate';
-  document.getElementById('est-submit-btn').textContent = 'Update Estimate';
-  const resendWrap = document.getElementById('est-resend-wrap');
-  resendWrap.style.display = 'flex';
+  // Client fields
+  document.getElementById('edit-client-name').value = est.client_name || '';
+  document.getElementById('edit-client-email').value = est.client_email || '';
+  document.getElementById('edit-client-phone').value = est.client_phone || '';
+  document.getElementById('edit-client-company').value = est.client_company || '';
+  document.getElementById('edit-client-address').value = est.client_address || '';
+  document.getElementById('edit-client-city').value = est.client_city || '';
+  document.getElementById('edit-client-state').value = est.client_state || '';
+  document.getElementById('edit-client-zip').value = est.client_zip || '';
+  document.getElementById('edit-notes').value = est.notes || '';
 
-  // Prefill client info
-  document.getElementById('est-client-name').value = est.client_name || '';
-  document.getElementById('est-client-email').value = est.client_email || '';
-  document.getElementById('est-client-phone').value = est.client_phone || '';
-  document.getElementById('est-client-company').value = est.client_company || '';
-  document.getElementById('est-client-address').value = est.client_address || '';
-  document.getElementById('est-client-city').value = est.client_city || '';
-  document.getElementById('est-client-state').value = est.client_state || '';
-  document.getElementById('est-client-zip').value = est.client_zip || '';
-  document.getElementById('est-notes').value = est.notes || '';
-
-  // Prefill tax
+  // Tax
   const useTax = est.tax_rate > 0;
-  document.getElementById('est-tax-toggle').checked = useTax;
-  document.getElementById('est-tax-input-wrap').style.display = useTax ? 'flex' : 'none';
-  if (useTax) document.getElementById('est-tax-rate').value = est.tax_rate;
+  document.getElementById('edit-est-tax-toggle').checked = useTax;
+  document.getElementById('edit-est-tax-input-wrap').style.display = useTax ? 'flex' : 'none';
+  if (useTax) document.getElementById('edit-est-tax-rate').value = est.tax_rate;
 
-  // Prefill items
-  document.getElementById('est-items-tbody').innerHTML = '';
-  estItemId = 0;
-  (est.items || []).forEach(item => {
-    addEstimateItem(item.description, item.explanation || '', item.type || 'item', item.cost, item.estimatedDays || '');
+  // Items
+  document.getElementById('edit-est-items-tbody').innerHTML = '';
+  editEstItemId = 0;
+  (est.items || []).forEach(item => addEditEstimateItem(item.description, item.explanation || '', item.type || 'item', item.cost, item.estimatedDays || ''));
+  recalcEditEstimateTotals();
+
+  openEditTab();
+  if (est.business_profile_id) document.getElementById('edit-business-select').value = est.business_profile_id;
+}
+
+async function submitEdit(e) {
+  e.preventDefault();
+  const clientName = document.getElementById('edit-client-name').value.trim();
+  const clientEmail = document.getElementById('edit-client-email').value.trim();
+  if (!clientName || !clientEmail) { showToast('Name and email required.', 'error'); return; }
+
+  const btn = document.getElementById('edit-submit-btn');
+  btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Saving...';
+
+  const clientPhone = buildPhone('edit-client-phone-cc', 'edit-client-phone');
+  const resendEmail = document.getElementById('edit-send-email').checked;
+  const resendSms = document.getElementById('edit-send-sms').checked;
+  const businessProfileId = document.getElementById('edit-business-select').value || null;
+  const notes = document.getElementById('edit-notes').value.trim();
+
+  try {
+    let url, payload;
+
+    if (currentEditInvoiceId) {
+      const useTax = document.getElementById('edit-tax-toggle').checked;
+      const taxRate = useTax ? (parseFloat(document.getElementById('edit-tax-rate').value) || 0) : 0;
+      const items = getEditItems();
+      if (!items.length) { showToast('Add at least one line item.', 'error'); btn.disabled = false; btn.textContent = 'Save Invoice Changes'; return; }
+      url = '/api/update-invoice';
+      payload = {
+        invoiceId: currentEditInvoiceId, clientName, clientEmail, clientPhone,
+        clientCompany: document.getElementById('edit-client-company').value.trim(),
+        clientAddress: document.getElementById('edit-client-address').value.trim(),
+        clientCity: document.getElementById('edit-client-city').value.trim(),
+        clientState: document.getElementById('edit-client-state').value.trim(),
+        clientZip: document.getElementById('edit-client-zip').value.trim(),
+        dueDate: document.getElementById('edit-due-date').value || null,
+        items, taxRate, notes, resendEmail, resendSms, businessProfileId,
+      };
+    } else {
+      const useTax = document.getElementById('edit-est-tax-toggle').checked;
+      const taxRate = useTax ? (parseFloat(document.getElementById('edit-est-tax-rate').value) || 0) : 0;
+      const items = getEditEstimateItems();
+      if (!items.length) { showToast('Add at least one item.', 'error'); btn.disabled = false; btn.textContent = 'Save Estimate Changes'; return; }
+      url = '/api/update-estimate';
+      payload = {
+        estimateId: currentEditEstimateId, clientName, clientEmail, clientPhone,
+        clientCompany: document.getElementById('edit-client-company').value.trim(),
+        clientAddress: document.getElementById('edit-client-address').value.trim(),
+        clientCity: document.getElementById('edit-client-city').value.trim(),
+        clientState: document.getElementById('edit-client-state').value.trim(),
+        clientZip: document.getElementById('edit-client-zip').value.trim(),
+        items, taxRate, notes, resendEmail, resendSms, businessProfileId,
+      };
+    }
+
+    const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed');
+    showToast('Changes saved!', 'success');
+    discardEdit();
+    loadInvoices();
+    loadEstimates();
+  } catch (err) {
+    showToast(err.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = currentEditInvoiceId ? 'Save Invoice Changes' : 'Save Estimate Changes';
+  }
+}
+
+// Edit tab line items — invoice
+function addEditItem(desc = '', type = 'item', qty = 1, price = '', discount = '', workDate = '') {
+  const id = ++editItemId;
+  const typeOptions = ITEM_TYPES.map(t => `<option value="${t.value}"${t.value === type ? ' selected' : ''}>${t.label}</option>`).join('');
+  const tr = document.createElement('tr');
+  tr.id = `edit-item-${id}`;
+  tr.innerHTML = `
+    <td><select id="edit-itype-${id}" onchange="recalcEditTotals()" style="width:100%;">${typeOptions}</select></td>
+    <td>
+      <input type="text" id="edit-desc-${id}" value="${escHtmlJs(desc)}" placeholder="Description" style="width:100%;margin-bottom:4px;">
+      <input type="date" id="edit-workdate-${id}" value="${workDate}" style="width:100%;font-size:12px;">
+    </td>
+    <td><input type="number" id="edit-qty-${id}" value="${qty}" min="0.01" step="any" oninput="recalcEditTotals()" style="width:100%;"></td>
+    <td><input type="number" id="edit-price-${id}" value="${price}" min="0" step="0.01" oninput="recalcEditTotals()" placeholder="0.00" style="width:100%;"></td>
+    <td><input type="number" id="edit-discount-${id}" value="${discount}" min="0" step="0.01" oninput="recalcEditTotals()" placeholder="0.00" style="width:100%;"></td>
+    <td style="text-align:right;font-weight:600;" id="edit-linetotal-${id}">$0.00</td>
+    <td><button type="button" onclick="document.getElementById('edit-item-${id}').remove();recalcEditTotals();" style="background:none;border:none;cursor:pointer;color:var(--gray-400);font-size:18px;">×</button></td>`;
+  document.getElementById('edit-items-tbody').appendChild(tr);
+  recalcEditTotals();
+}
+
+function getEditItems() {
+  const rows = document.querySelectorAll('#edit-items-tbody tr');
+  return Array.from(rows).map(row => {
+    const id = row.id.replace('edit-item-', '');
+    return {
+      type: document.getElementById(`edit-itype-${id}`)?.value || 'item',
+      description: document.getElementById(`edit-desc-${id}`)?.value.trim() || '',
+      quantity: parseFloat(document.getElementById(`edit-qty-${id}`)?.value) || 1,
+      unitPrice: parseFloat(document.getElementById(`edit-price-${id}`)?.value) || 0,
+      discount: parseFloat(document.getElementById(`edit-discount-${id}`)?.value) || 0,
+      workDate: document.getElementById(`edit-workdate-${id}`)?.value || '',
+    };
+  }).filter(i => i.description);
+}
+
+function recalcEditTotals() {
+  const useTax = document.getElementById('edit-tax-toggle').checked;
+  const taxRate = useTax ? (parseFloat(document.getElementById('edit-tax-rate').value) || 0) : 0;
+  let subtotal = 0;
+  document.querySelectorAll('#edit-items-tbody tr').forEach(row => {
+    const id = row.id.replace('edit-item-', '');
+    const qty = parseFloat(document.getElementById(`edit-qty-${id}`)?.value) || 0;
+    const price = parseFloat(document.getElementById(`edit-price-${id}`)?.value) || 0;
+    const disc = parseFloat(document.getElementById(`edit-discount-${id}`)?.value) || 0;
+    const lt = qty * price;
+    const net = lt - Math.min(disc, lt);
+    subtotal += net;
+    const el = document.getElementById(`edit-linetotal-${id}`);
+    if (el) el.textContent = `$${net.toFixed(2)}`;
   });
-  recalcEstimateTotals();
-
-  window.scrollTo({ top: 0, behavior: 'smooth' });
+  const taxAmt = subtotal * (taxRate / 100);
+  document.getElementById('edit-subtotal-display').textContent = `$${subtotal.toFixed(2)}`;
+  const taxRow = document.getElementById('edit-tax-row');
+  if (taxRow) taxRow.style.display = taxRate > 0 ? '' : 'none';
+  document.getElementById('edit-tax-display').textContent = `$${taxAmt.toFixed(2)}`;
+  document.getElementById('edit-tax-label').textContent = `Tax (${taxRate}%)`;
+  document.getElementById('edit-total-display').textContent = `$${(subtotal + taxAmt).toFixed(2)}`;
 }
 
-function cancelEstimateEdit() {
-  resetEstimateForm();
+function toggleEditTax() {
+  const wrap = document.getElementById('edit-tax-input-wrap');
+  wrap.style.display = document.getElementById('edit-tax-toggle').checked ? 'flex' : 'none';
+  recalcEditTotals();
 }
+
+// Edit tab line items — estimate
+function addEditEstimateItem(desc = '', explanation = '', type = 'item', cost = '', days = '') {
+  const id = ++editEstItemId;
+  const typeOptions = ITEM_TYPES.map(t => `<option value="${t.value}"${t.value === type ? ' selected' : ''}>${t.label}</option>`).join('');
+  const tr = document.createElement('tr');
+  tr.id = `edit-est-item-${id}`;
+  tr.innerHTML = `
+    <td><select style="width:100%;">${typeOptions}</select></td>
+    <td>
+      <input type="text" id="edit-est-desc-${id}" value="${escHtmlJs(desc)}" placeholder="Description" style="width:100%;margin-bottom:4px;">
+      <input type="text" id="edit-est-expl-${id}" value="${escHtmlJs(explanation)}" placeholder="Explanation (optional)" style="width:100%;font-size:12px;color:var(--gray-500);">
+    </td>
+    <td><input type="number" id="edit-est-cost-${id}" value="${cost}" min="0" step="0.01" oninput="recalcEditEstimateTotals()" placeholder="0.00" style="width:100%;"></td>
+    <td><input type="number" id="edit-est-days-${id}" value="${days}" min="0" step="1" oninput="recalcEditEstimateTotals()" placeholder="0" style="width:100%;"></td>
+    <td><button type="button" onclick="document.getElementById('edit-est-item-${id}').remove();recalcEditEstimateTotals();" style="background:none;border:none;cursor:pointer;color:var(--gray-400);font-size:18px;">×</button></td>`;
+  document.getElementById('edit-est-items-tbody').appendChild(tr);
+  recalcEditEstimateTotals();
+}
+
+function getEditEstimateItems() {
+  const rows = document.querySelectorAll('#edit-est-items-tbody tr');
+  return Array.from(rows).map(row => {
+    const id = row.id.replace('edit-est-item-', '');
+    return {
+      description: document.getElementById(`edit-est-desc-${id}`)?.value.trim() || '',
+      explanation: document.getElementById(`edit-est-expl-${id}`)?.value.trim() || '',
+      cost: parseFloat(document.getElementById(`edit-est-cost-${id}`)?.value) || 0,
+      estimatedDays: parseFloat(document.getElementById(`edit-est-days-${id}`)?.value) || 0,
+    };
+  }).filter(i => i.description);
+}
+
+function recalcEditEstimateTotals() {
+  const useTax = document.getElementById('edit-est-tax-toggle').checked;
+  const taxRate = useTax ? (parseFloat(document.getElementById('edit-est-tax-rate').value) || 0) : 0;
+  let subtotal = 0;
+  document.querySelectorAll('#edit-est-items-tbody tr').forEach(row => {
+    const id = row.id.replace('edit-est-item-', '');
+    subtotal += parseFloat(document.getElementById(`edit-est-cost-${id}`)?.value) || 0;
+  });
+  const taxAmt = subtotal * (taxRate / 100);
+  document.getElementById('edit-est-subtotal-display').textContent = `$${subtotal.toFixed(2)}`;
+  const taxRow = document.getElementById('edit-est-tax-row');
+  if (taxRow) taxRow.style.display = taxRate > 0 ? '' : 'none';
+  document.getElementById('edit-est-tax-display').textContent = `$${taxAmt.toFixed(2)}`;
+  document.getElementById('edit-est-tax-label').textContent = `Tax (${taxRate}%)`;
+  document.getElementById('edit-est-total-display').textContent = `$${(subtotal + taxAmt).toFixed(2)}`;
+}
+
+function toggleEditEstimateTax() {
+  const wrap = document.getElementById('edit-est-tax-input-wrap');
+  wrap.style.display = document.getElementById('edit-est-tax-toggle').checked ? 'flex' : 'none';
+  recalcEditEstimateTotals();
+}
+
+// ─── Delete ───────────────────────────────────────────────────────────────────
+
+async function deleteInvoice(id) {
+  const inv = invoicesCache.find(i => i.id === id);
+  if (!confirm(`Delete invoice ${inv?.invoice_number || ''}? This cannot be undone.`)) return;
+  try {
+    const res = await fetch('/api/delete-invoice', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) });
+    if (res.ok) { showToast('Invoice deleted.', 'success'); loadInvoices(); }
+    else showToast('Failed to delete.', 'error');
+  } catch { showToast('Failed to delete.', 'error'); }
+}
+
+async function deleteEstimate(id) {
+  const est = estimatesCache.find(e => e.id === id);
+  if (!confirm(`Delete estimate ${est?.estimate_number || ''}? This cannot be undone.`)) return;
+  try {
+    const res = await fetch('/api/delete-estimate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) });
+    if (res.ok) { showToast('Estimate deleted.', 'success'); loadEstimates(); }
+    else showToast('Failed to delete.', 'error');
+  } catch { showToast('Failed to delete.', 'error'); }
 
 // ─── Photo helpers ────────────────────────────────────────────────────────────
 
