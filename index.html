@@ -25,7 +25,6 @@
     </div>
 
     <div class="landing-card">
-      <div class="landing-logo" id="landing-biz-name"></div>
       <div class="landing-tagline" id="landing-tagline"></div>
 
       <a href="client.html" class="landing-btn">Pay Here</a>
@@ -41,13 +40,10 @@
     fetch('/api/get-business-profile')
       .then(r => r.json())
       .then(biz => {
-        document.getElementById('landing-biz-name').textContent = biz.name || 'Invoice Pro';
-        document.title = biz.name || 'Invoice Pro';
+        document.title = biz.name || 'InvoiceMePro';
         if (biz.tagline) document.getElementById('landing-tagline').textContent = biz.tagline;
       })
-      .catch(() => {
-        document.getElementById('landing-biz-name').textContent = 'Invoice Pro';
-      });
+      .catch(() => {});
   </script>
 </body>
 </html>
