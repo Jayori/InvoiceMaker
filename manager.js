@@ -1308,6 +1308,7 @@ function editInvoice(id) {
   (inv.items || []).forEach(item => addEditItem(item.description, item.type || 'item', item.quantity, item.unitPrice, item.discount || '', item.workDate || ''));
   recalcEditTotals();
 
+  loadEditPhotos(inv.receipt_photos);
   openEditTab();
   if (inv.business_profile_id) document.getElementById('edit-business-select').value = inv.business_profile_id;
 }
@@ -1346,6 +1347,7 @@ function editEstimate(id) {
   (est.items || []).forEach(item => addEditEstimateItem(item.description, item.explanation || '', item.type || 'item', item.cost, item.estimatedDays || ''));
   recalcEditEstimateTotals();
 
+  loadEditPhotos(est.receipt_photos);
   openEditTab();
   if (est.business_profile_id) document.getElementById('edit-business-select').value = est.business_profile_id;
 }
@@ -1383,6 +1385,7 @@ async function submitEdit(e) {
         clientZip: document.getElementById('edit-client-zip').value.trim(),
         dueDate: document.getElementById('edit-due-date').value || null,
         items, taxRate, notes, resendEmail, resendSms, businessProfileId,
+        receiptPhotos: [..._editPhotos, ..._editNewPhotos],
       };
     } else {
       const useTax = document.getElementById('edit-est-tax-toggle').checked;
@@ -1398,6 +1401,7 @@ async function submitEdit(e) {
         clientState: document.getElementById('edit-client-state').value.trim(),
         clientZip: document.getElementById('edit-client-zip').value.trim(),
         items, taxRate, notes, resendEmail, resendSms, businessProfileId,
+        receiptPhotos: [..._editPhotos, ..._editNewPhotos],
       };
     }
 
@@ -1557,6 +1561,66 @@ async function deleteEstimate(id) {
     if (res.ok) { showToast('Estimate deleted.', 'success'); loadEstimates(); }
     else showToast('Failed to delete.', 'error');
   } catch { showToast('Failed to delete.', 'error'); }
+}
+
+// ─── Edit-form photo management ───────────────────────────────────────────────
+
+let _editPhotos = [];    // existing URLs kept so far
+let _editNewPhotos = []; // newly compressed base64 strings
+
+function loadEditPhotos(photos) {
+  _editPhotos = [...(photos || [])];
+  _editNewPhotos = [];
+  renderEditExistingPhotos();
+  document.getElementById('edit-new-photo-preview').innerHTML = '';
+  const input = document.getElementById('edit-photos');
+  if (input) input.value = '';
+}
+
+function renderEditExistingPhotos() {
+  const wrap = document.getElementById('edit-existing-photos');
+  if (!wrap) return;
+  if (!_editPhotos.length) { wrap.innerHTML = '<span style="font-size:13px;color:var(--gray-400);">No photos attached.</span>'; return; }
+  wrap.innerHTML = _editPhotos.map((url, i) => `
+    <div class="receipt-thumb-wrap">
+      <img src="${esc(url)}" class="receipt-thumb" onclick="openPhotoLightbox(_editPhotos,${i})">
+      <button type="button" class="receipt-thumb-remove" onclick="removeEditPhoto(${i})" title="Remove photo">✕</button>
+    </div>`).join('');
+}
+
+function removeEditPhoto(index) {
+  _editPhotos.splice(index, 1);
+  renderEditExistingPhotos();
+}
+
+async function addEditPhotos(input) {
+  const files = Array.from(input.files).slice(0, Math.max(0, 5 - _editPhotos.length - _editNewPhotos.length));
+  if (!files.length) return;
+  const compressed = await Promise.all(files.map(compressPhoto));
+  _editNewPhotos.push(...compressed);
+  // Show previews of new photos
+  const wrap = document.getElementById('edit-new-photo-preview');
+  _editNewPhotos.forEach((dataUrl, i) => {
+    if (wrap.children[i]) return; // already shown
+    const div = document.createElement('div');
+    div.className = 'receipt-thumb-wrap';
+    div.innerHTML = `<img src="${dataUrl}" class="receipt-thumb"><button type="button" class="receipt-thumb-remove" onclick="removeEditNewPhoto(${i})" title="Remove">✕</button>`;
+    wrap.appendChild(div);
+  });
+  input.value = '';
+}
+
+function removeEditNewPhoto(index) {
+  _editNewPhotos.splice(index, 1);
+  // Re-render the new photo preview strip
+  const wrap = document.getElementById('edit-new-photo-preview');
+  wrap.innerHTML = '';
+  _editNewPhotos.forEach((dataUrl, i) => {
+    const div = document.createElement('div');
+    div.className = 'receipt-thumb-wrap';
+    div.innerHTML = `<img src="${dataUrl}" class="receipt-thumb"><button type="button" class="receipt-thumb-remove" onclick="removeEditNewPhoto(${i})" title="Remove">✕</button>`;
+    wrap.appendChild(div);
+  });
 }
 
 // ─── Photo helpers ────────────────────────────────────────────────────────────

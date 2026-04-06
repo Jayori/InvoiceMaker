@@ -475,6 +475,17 @@ textarea { resize: vertical; min-height: 80px; }
 .receipt-photos-wrap { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
 .receipt-thumb { width: 80px; height: 80px; object-fit: cover; border-radius: 8px; border: 2px solid var(--gray-200); cursor: pointer; transition: opacity 0.15s, transform 0.15s; }
 .receipt-thumb:hover { opacity: 0.85; transform: scale(1.04); }
+.receipt-thumb-wrap { position: relative; display: inline-block; }
+.receipt-thumb-remove {
+  position: absolute; top: -6px; right: -6px;
+  width: 20px; height: 20px; border-radius: 50%;
+  background: var(--red); color: #fff; border: none;
+  font-size: 12px; line-height: 1; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+  z-index: 1;
+}
+.receipt-thumb-remove:hover { background: #b91c1c; }
 
 /* ─── Photo Lightbox ──────────────────────────────── */
 .photo-lightbox {
