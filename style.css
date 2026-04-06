@@ -121,7 +121,7 @@ textarea { resize: vertical; min-height: 80px; }
 ═══════════════════════════════════════════════════ */
 .landing-body { background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 50%, #1a56db 100%); min-height: 100vh; display: flex; align-items: center; justify-content: center; }
 
-.landing-wrap { display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 40px 20px; }
+.landing-wrap { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; padding: 40px 20px; }
 
 .landing-card { text-align: center; max-width: 440px; width: 100%; }
 
@@ -294,3 +294,35 @@ textarea { resize: vertical; min-height: 80px; }
 
 /* Manager estimates table */
 .badge-rejected { background: #fee2e2; color: #991b1b; }
+
+/* ═══════════════════════════════════════════════════
+   LANDING — APP BRAND
+═══════════════════════════════════════════════════ */
+.landing-app-brand { display: flex; align-items: center; gap: 12px; margin-bottom: 32px; justify-content: center; }
+.landing-app-name { font-size: 22px; font-weight: 800; color: #fff; letter-spacing: -0.02em; }
+
+/* ═══════════════════════════════════════════════════
+   RECEIPT PHOTOS
+═══════════════════════════════════════════════════ */
+.receipt-photos-wrap { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
+.receipt-thumb { width: 80px; height: 80px; object-fit: cover; border-radius: 8px; border: 2px solid var(--gray-200); cursor: pointer; transition: opacity 0.15s; }
+.receipt-thumb:hover { opacity: 0.8; }
+.photo-upload-label { display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border: 2px dashed var(--gray-300); border-radius: 8px; cursor: pointer; font-size: 13px; color: var(--gray-500); transition: border-color 0.15s, color 0.15s; }
+.photo-upload-label:hover { border-color: var(--blue); color: var(--blue); }
+
+/* ═══════════════════════════════════════════════════
+   INVOICE — WORK DATES & DISCOUNTS (client view)
+═══════════════════════════════════════════════════ */
+.work-date-header { font-size: 11px; font-weight: 700; color: var(--gray-500); text-transform: uppercase; letter-spacing: 0.06em; padding: 10px 0 4px; border-bottom: 2px solid var(--gray-100); margin-top: 8px; }
+.item-original-amt { text-decoration: line-through; color: var(--gray-400); font-size: 13px; }
+.item-discount-credit { color: var(--green); font-size: 12px; font-weight: 600; }
+
+/* ═══════════════════════════════════════════════════
+   DEPOSIT / PREPAYMENT (client view)
+═══════════════════════════════════════════════════ */
+.deposit-pay-section { background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 16px 20px; margin: 16px 0; }
+.deposit-pay-label { font-size: 12px; font-weight: 700; color: #1e40af; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px; }
+.deposit-pay-amount { font-size: 22px; font-weight: 800; color: #1a56db; margin-bottom: 10px; }
+.deposit-pay-btn { display: inline-block; background: #1a56db; color: #fff; padding: 12px 28px; border-radius: 8px; font-size: 15px; font-weight: 700; text-decoration: none; }
+.deposit-pay-btn:hover { background: #1e40af; }
+.deposit-paid-notice { background: var(--green-light); border: 1px solid #6ee7b7; color: var(--green); padding: 10px 16px; border-radius: 8px; font-size: 14px; font-weight: 600; display: inline-block; }

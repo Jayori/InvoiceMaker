@@ -152,6 +152,21 @@
                   </div>
                   <div id="convert-success" style="display:none;margin-top:12px;color:var(--green);font-size:14px;font-weight:500;"></div>
                 </div>
+
+                <!-- Deposit / Prepayment -->
+                <div id="deposit-section" style="display:none;margin-top:24px;padding-top:20px;border-top:2px solid var(--gray-100);">
+                  <div class="card-title" style="margin:0 0 8px;color:#1a56db;">Request Deposit / Prepayment</div>
+                  <p style="font-size:13px;color:var(--gray-500);margin:0 0 14px;">Set a deposit amount to collect upfront for materials or to get started.</p>
+                  <div id="deposit-existing" style="display:none;margin-bottom:14px;padding:12px 14px;background:#eff6ff;border-radius:8px;border:1px solid #bfdbfe;font-size:13px;color:var(--gray-700);"></div>
+                  <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+                    <div style="display:flex;align-items:center;gap:6px;">
+                      <span style="font-size:16px;font-weight:700;color:var(--gray-700);">$</span>
+                      <input type="number" id="deposit-amount-input" placeholder="0.00" min="0.01" step="0.01" style="width:120px;">
+                    </div>
+                    <button class="btn btn-primary" onclick="createDeposit()">Send Deposit Request</button>
+                  </div>
+                  <div id="deposit-result" style="margin-top:12px;font-size:14px;"></div>
+                </div>
               </div>
             </div>
           </div>
@@ -213,10 +228,11 @@
               <div class="items-table-wrap">
                 <table class="items-table">
                   <thead><tr>
-                    <th style="width:28%;">Type</th>
-                    <th style="width:30%;">Description</th>
-                    <th style="width:12%;" id="qty-header">Qty</th>
-                    <th style="width:15%;" id="rate-header">Rate ($)</th>
+                    <th style="width:18%;">Type</th>
+                    <th style="width:24%;">Description / Date</th>
+                    <th style="width:8%;" id="qty-header">Qty</th>
+                    <th style="width:12%;" id="rate-header">Rate ($)</th>
+                    <th style="width:11%;">Discount ($)</th>
                     <th style="width:10%;text-align:right;">Total</th>
                     <th style="width:5%;"></th>
                   </tr></thead>
@@ -251,6 +267,18 @@
             <div class="card">
               <div class="card-title">Notes (optional)</div>
               <textarea id="notes" placeholder="Payment terms, thank you message, special instructions..." style="width:100%;"></textarea>
+            </div>
+
+            <!-- Receipt Photos -->
+            <div class="card">
+              <div class="card-title">Receipt Photos (optional)</div>
+              <p style="font-size:13px;color:var(--gray-500);margin:0 0 12px;">Attach up to 5 photos — receipts, work completed, materials, etc.</p>
+              <label class="photo-upload-label" for="invoice-photos">
+                <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                Select photos
+              </label>
+              <input type="file" id="invoice-photos" accept="image/*" multiple style="display:none;" onchange="previewPhotos(this,'invoice-photo-preview')">
+              <div class="receipt-photos-wrap" id="invoice-photo-preview"></div>
             </div>
 
             <div class="form-actions">
@@ -417,6 +445,18 @@
             <div class="card">
               <div class="card-title">Notes (optional)</div>
               <textarea id="est-notes" placeholder="Any additional notes for the client..." style="width:100%;"></textarea>
+            </div>
+
+            <!-- Receipt Photos -->
+            <div class="card">
+              <div class="card-title">Receipt Photos (optional)</div>
+              <p style="font-size:13px;color:var(--gray-500);margin:0 0 12px;">Attach up to 5 photos — receipts, materials, site photos, etc.</p>
+              <label class="photo-upload-label" for="est-photos">
+                <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                Select photos
+              </label>
+              <input type="file" id="est-photos" accept="image/*" multiple style="display:none;" onchange="previewPhotos(this,'est-photo-preview')">
+              <div class="receipt-photos-wrap" id="est-photo-preview"></div>
             </div>
 
             <div class="form-actions">

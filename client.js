@@ -127,18 +127,56 @@ function renderInvoiceDetails(inv, justPaid) {
     ? new Date(inv.due_date).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
     : 'Upon receipt';
 
-  // Line items
+  // Line items — group by work date
   const tbody = document.getElementById('inv-items-tbody');
-  tbody.innerHTML = (inv.items || []).map(item => {
-    const lineTotal = (item.quantity * item.unitPrice).toFixed(2);
+  const dated = {}, undated = [];
+  (inv.items || []).forEach(item => {
+    if (item.workDate) {
+      if (!dated[item.workDate]) dated[item.workDate] = [];
+      dated[item.workDate].push(item);
+    } else {
+      undated.push(item);
+    }
+  });
+
+  function buildItemRow(item) {
+    const lineTotal = item.quantity * item.unitPrice;
+    const disc = Math.min(Number(item.discount) || 0, lineTotal);
+    const netTotal = lineTotal - disc;
     const qtyLabel = item.type === 'hours' ? `${item.quantity} hrs` : `x${item.quantity}`;
+    const rateDisplay = disc > 0
+      ? `<span class="item-original-amt">$${Number(item.unitPrice).toFixed(2)}</span>`
+      : `$${Number(item.unitPrice).toFixed(2)}`;
+    const discountRow = disc > 0
+      ? `<tr><td colspan="3" style="padding:1px 0 6px;font-size:12px;"><span class="item-discount-credit">✓ Courtesy discount: -$${disc.toFixed(2)}</span></td><td></td></tr>`
+      : '';
     return `<tr>
       <td>${esc(item.description)}${item.type === 'hours' ? ' <span class="item-type-tag">hourly</span>' : ''}</td>
       <td style="text-align:center;color:var(--gray-500);">${qtyLabel}</td>
-      <td style="text-align:right;">$${Number(item.unitPrice).toFixed(2)}</td>
-      <td style="text-align:right;font-weight:500;">$${lineTotal}</td>
-    </tr>`;
-  }).join('');
+      <td style="text-align:right;">${rateDisplay}</td>
+      <td style="text-align:right;font-weight:500;">$${netTotal.toFixed(2)}</td>
+    </tr>${discountRow}`;
+  }
+
+  let rowsHtml = undated.map(buildItemRow).join('');
+  Object.keys(dated).sort().forEach(date => {
+    const dateStr = new Date(date + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+    rowsHtml += `<tr><td colspan="4"><div class="work-date-header">${esc(dateStr)}</div></td></tr>`;
+    rowsHtml += dated[date].map(buildItemRow).join('');
+  });
+  tbody.innerHTML = rowsHtml;
+
+  // Receipt photos
+  const photosSection = document.getElementById('inv-photos-section');
+  if (photosSection) {
+    const photos = inv.receipt_photos || [];
+    if (photos.length) {
+      photosSection.style.display = '';
+      photosSection.innerHTML = `<div class="inv-label" style="margin-bottom:8px;">Photos</div><div class="receipt-photos-wrap">${photos.map(p => `<img src="${esc(p)}" class="receipt-thumb" onclick="window.open('${esc(p)}','_blank')">`).join('')}</div>`;
+    } else {
+      photosSection.style.display = 'none';
+    }
+  }
 
   // Totals
   document.getElementById('inv-subtotal').textContent = `$${Number(inv.subtotal).toFixed(2)}`;
@@ -300,12 +338,23 @@ function renderEstimates(estimates) {
 
         ${est.notes ? `<div class="est-notes">${esc(est.notes)}</div>` : ''}
 
+        ${(est.receipt_photos?.length) ? `<div style="margin-bottom:12px;"><div class="est-big-label" style="margin-bottom:6px;">Photos</div><div class="receipt-photos-wrap">${(est.receipt_photos || []).map(p => `<img src="${esc(p)}" class="receipt-thumb" onclick="window.open('${esc(p)}','_blank')">`).join('')}</div></div>` : ''}
+
         ${isPending ? `
         <div class="est-actions">
           <button class="btn est-btn-approve" onclick="estimateAction('${est.id}', 'approve')">✓ Approve</button>
           <button class="btn est-btn-reject" onclick="estimateAction('${est.id}', 'reject')">✗ Decline</button>
           <button class="btn est-btn-question" onclick="toggleMsgForm('${est.id}')">? Ask a Question</button>
         </div>` : ''}
+
+        ${est.deposit_payment_link && !est.deposit_paid ? `
+        <div class="deposit-pay-section">
+          <div class="deposit-pay-label">Deposit Requested</div>
+          <div class="deposit-pay-amount">$${Number(est.deposit_amount).toFixed(2)}</div>
+          <a href="${esc(est.deposit_payment_link)}" class="deposit-pay-btn" target="_blank">Pay Deposit Now</a>
+          <p style="font-size:12px;color:#3730a3;margin:10px 0 0;">Secure payment powered by Square</p>
+        </div>` : ''}
+        ${est.deposit_paid ? `<div style="margin:12px 0;"><span class="deposit-paid-notice">✓ Deposit of $${Number(est.deposit_amount).toFixed(2)} received — thank you!</span></div>` : ''}
 
         ${chatHtml}
         ${msgFormHtml}

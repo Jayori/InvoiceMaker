@@ -161,7 +161,7 @@ const ITEM_TYPES = [
   { value: 'other',    label: 'Other' },
 ];
 
-function addItem(desc = '', type = 'item', qty = 1, price = '') {
+function addItem(desc = '', type = 'item', qty = 1, price = '', discount = '', workDate = '') {
   const id = ++itemId;
   const typeOptions = ITEM_TYPES.map(t => `<option value="${t.value}"${t.value === type ? ' selected' : ''}>${t.label}</option>`).join('');
   const isHours = type === 'hours';
@@ -173,9 +173,13 @@ function addItem(desc = '', type = 'item', qty = 1, price = '') {
         ${typeOptions}
       </select>
     </td>
-    <td><input type="text" placeholder="Description" value="${escAttr(desc)}" required oninput="recalcTotals()"></td>
-    <td><input type="number" id="qty-${id}" value="${qty}" min="0.01" step="0.01" required oninput="recalcTotals()" style="width:70px;" title="${isHours ? 'Hours' : 'Quantity'}"></td>
-    <td><input type="number" id="price-${id}" value="${price}" placeholder="0.00" min="0" step="0.01" required oninput="recalcTotals()" style="width:90px;" title="${isHours ? 'Hourly Rate' : 'Unit Price'}"></td>
+    <td>
+      <input type="text" id="desc-${id}" placeholder="Description" value="${escAttr(desc)}" required oninput="recalcTotals()" style="width:100%;margin-bottom:3px;">
+      <input type="date" id="workdate-${id}" value="${escAttr(workDate)}" title="Work date (optional)" style="width:100%;font-size:11px;padding:3px 6px;border:1px solid var(--gray-200);border-radius:4px;color:var(--gray-500);">
+    </td>
+    <td><input type="number" id="qty-${id}" value="${qty}" min="0.01" step="0.01" required oninput="recalcTotals()" style="width:60px;" title="${isHours ? 'Hours' : 'Quantity'}"></td>
+    <td><input type="number" id="price-${id}" value="${price}" placeholder="0.00" min="0" step="0.01" required oninput="recalcTotals()" style="width:80px;" title="${isHours ? 'Hourly Rate' : 'Unit Price'}"></td>
+    <td><input type="number" id="discount-${id}" value="${discount}" placeholder="0.00" min="0" step="0.01" oninput="recalcTotals()" style="width:80px;" title="Discount amount (optional)"></td>
     <td class="item-total-cell" id="item-total-${id}" style="text-align:right;">$0.00</td>
     <td><button type="button" class="remove-item-btn" onclick="removeItem(${id})">&#x2715;</button></td>
   `;
@@ -199,13 +203,19 @@ function removeItem(id) {
 
 function getItems() {
   return Array.from(document.getElementById('items-tbody').querySelectorAll('tr')).map(row => {
-    const inputs = row.querySelectorAll('input[type=text],input[type=number]');
+    const id = row.id.replace('item-', '');
     const sel = row.querySelector('select');
+    const workDate = document.getElementById(`workdate-${id}`)?.value || null;
+    const discount = parseFloat(document.getElementById(`discount-${id}`)?.value) || 0;
+    const qty = parseFloat(document.getElementById(`qty-${id}`)?.value) || 0;
+    const unitPrice = parseFloat(document.getElementById(`price-${id}`)?.value) || 0;
     return {
       type: sel?.value || 'item',
-      description: inputs[0]?.value.trim() || '',
-      quantity: parseFloat(inputs[1]?.value) || 0,
-      unitPrice: parseFloat(inputs[2]?.value) || 0,
+      description: document.getElementById(`desc-${id}`)?.value.trim() || '',
+      workDate: workDate || null,
+      quantity: qty,
+      unitPrice,
+      discount,
     };
   });
 }
@@ -214,14 +224,22 @@ function recalcTotals() {
   const items = getItems();
   const useTax = document.getElementById('tax-toggle')?.checked;
   const taxRate = useTax ? (parseFloat(document.getElementById('tax-rate')?.value) || 0) : 0;
-  const subtotal = items.reduce((s, i) => s + i.quantity * i.unitPrice, 0);
+  const subtotal = items.reduce((s, i) => {
+    const lineTotal = i.quantity * i.unitPrice;
+    const disc = Math.min(i.discount || 0, lineTotal);
+    return s + lineTotal - disc;
+  }, 0);
   const taxAmount = subtotal * (taxRate / 100);
   const total = subtotal + taxAmount;
 
   // Per-row totals
   document.getElementById('items-tbody').querySelectorAll('tr').forEach((row, i) => {
     const cell = row.querySelector('.item-total-cell');
-    if (cell && items[i]) cell.textContent = `$${(items[i].quantity * items[i].unitPrice).toFixed(2)}`;
+    if (cell && items[i]) {
+      const lineTotal = items[i].quantity * items[i].unitPrice;
+      const disc = Math.min(items[i].discount || 0, lineTotal);
+      cell.textContent = `$${(lineTotal - disc).toFixed(2)}`;
+    }
   });
 
   document.getElementById('subtotal-display').textContent = `$${subtotal.toFixed(2)}`;
@@ -254,6 +272,8 @@ async function submitInvoice(e) {
   const useTax = document.getElementById('tax-toggle').checked;
   const taxRate = useTax ? (parseFloat(document.getElementById('tax-rate').value) || 0) : 0;
 
+  const receiptPhotos = await collectPhotos('invoice-photos');
+
   const payload = {
     clientName: document.getElementById('client-name').value.trim(),
     clientEmail: document.getElementById('client-email').value.trim(),
@@ -265,6 +285,7 @@ async function submitInvoice(e) {
     notes: document.getElementById('notes').value.trim(),
     dueDate: document.getElementById('due-date').value || null,
     sendSmsNotification: document.getElementById('inv-send-sms').checked,
+    receiptPhotos,
   };
 
   // Optionally save client
@@ -307,6 +328,8 @@ function resetInvoiceForm() {
   itemId = 0;
   document.getElementById('tax-input-wrap').style.display = 'none';
   document.getElementById('tax-row').style.display = 'none';
+  const photoPreview = document.getElementById('invoice-photo-preview');
+  if (photoPreview) photoPreview.innerHTML = '';
   ['client-name','client-email','client-phone','client-company','client-address','notes'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.value = '';
@@ -550,12 +573,15 @@ async function openEstimateDetail(estimateId) {
 
     renderEstimateChat(est.messages || []);
 
-    // Show convert-to-invoice section for approved estimates
+    // Show convert-to-invoice and deposit sections for approved estimates
     if (est.status === 'approved') {
       showConvertToInvoice(est);
+      showDepositSection(est);
     } else {
       const section = document.getElementById('convert-invoice-section');
       if (section) section.style.display = 'none';
+      const depSection = document.getElementById('deposit-section');
+      if (depSection) depSection.style.display = 'none';
     }
   } catch {
     document.getElementById('est-chat-thread').innerHTML = '<div style="color:red;">Failed to load.</div>';
@@ -840,6 +866,8 @@ async function submitEstimate(e) {
   const useTax = document.getElementById('est-tax-toggle').checked;
   const taxRate = useTax ? (parseFloat(document.getElementById('est-tax-rate').value) || 0) : 0;
 
+  const receiptPhotos = await collectPhotos('est-photos');
+
   const payload = {
     clientName: document.getElementById('est-client-name').value.trim(),
     clientEmail: document.getElementById('est-client-email').value.trim(),
@@ -850,6 +878,7 @@ async function submitEstimate(e) {
     taxRate,
     notes: document.getElementById('est-notes').value.trim(),
     sendSmsNotification: document.getElementById('est-send-sms').checked,
+    receiptPhotos,
   };
 
   if (document.getElementById('est-save-client-check').checked) {
@@ -891,6 +920,8 @@ function resetEstimateForm() {
   document.getElementById('est-tax-input-wrap').style.display = 'none';
   document.getElementById('est-tax-row').style.display = 'none';
   document.getElementById('est-completion-display').style.display = 'none';
+  const photoPreview = document.getElementById('est-photo-preview');
+  if (photoPreview) photoPreview.innerHTML = '';
   ['est-client-name','est-client-email','est-client-phone','est-client-company','est-client-address','est-notes'].forEach(id => {
     const el = document.getElementById(id); if (el) el.value = '';
   });
@@ -904,4 +935,103 @@ function populateEstimateClientDropdown() {
   if (!sel || !clientsCache.length) return;
   sel.innerHTML = '<option value="">— Select a saved client or fill in below —</option>' +
     clientsCache.map(c => `<option value="${c.id}">${esc(c.name)}${c.company ? ` (${esc(c.company)})` : ''}</option>`).join('');
+}
+
+// ─── Photo helpers ────────────────────────────────────────────────────────────
+
+function previewPhotos(input, previewId) {
+  const wrap = document.getElementById(previewId);
+  if (!wrap) return;
+  wrap.innerHTML = '';
+  const files = Array.from(input.files).slice(0, 5);
+  files.forEach(file => {
+    const reader = new FileReader();
+    reader.onload = e => {
+      const img = document.createElement('img');
+      img.src = e.target.result;
+      img.className = 'receipt-thumb';
+      img.title = file.name;
+      wrap.appendChild(img);
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+function compressPhoto(file) {
+  return new Promise(resolve => {
+    const reader = new FileReader();
+    reader.onload = e => {
+      const img = new Image();
+      img.onload = () => {
+        const MAX = 900;
+        let w = img.width, h = img.height;
+        if (w > h) { if (w > MAX) { h = Math.round(h * MAX / w); w = MAX; } }
+        else { if (h > MAX) { w = Math.round(w * MAX / h); h = MAX; } }
+        const canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL('image/jpeg', 0.7));
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+async function collectPhotos(inputId) {
+  const input = document.getElementById(inputId);
+  if (!input?.files?.length) return [];
+  const files = Array.from(input.files).slice(0, 5);
+  return Promise.all(files.map(compressPhoto));
+}
+
+// ─── Deposit / Prepayment ────────────────────────────────────────────────────
+
+function showDepositSection(estimate) {
+  const section = document.getElementById('deposit-section');
+  const existing = document.getElementById('deposit-existing');
+  const resultEl = document.getElementById('deposit-result');
+  if (!section) return;
+
+  section.style.display = '';
+  resultEl.innerHTML = '';
+
+  if (estimate.deposit_payment_link) {
+    const paidHtml = estimate.deposit_paid
+      ? `<span style="color:var(--green);font-weight:600;">✓ Deposit paid</span>`
+      : `<span style="color:#92400e;font-weight:600;">Awaiting payment</span> — <a href="${esc(estimate.deposit_payment_link)}" target="_blank" style="color:var(--blue);">View payment link</a>`;
+    existing.innerHTML = `Deposit request: <strong>$${Number(estimate.deposit_amount).toFixed(2)}</strong> &nbsp;·&nbsp; ${paidHtml}`;
+    existing.style.display = '';
+  } else {
+    existing.style.display = 'none';
+  }
+}
+
+async function createDeposit() {
+  if (!currentEstimateId) return;
+  const amount = parseFloat(document.getElementById('deposit-amount-input').value);
+  if (!amount || amount <= 0) { showToast('Enter a valid deposit amount.', 'error'); return; }
+
+  const btn = document.querySelector('#deposit-section .btn-primary');
+  btn.disabled = true; btn.textContent = 'Creating...';
+
+  try {
+    const res = await fetch('/api/create-deposit', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ estimateId: currentEstimateId, depositAmount: amount }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(`${data.error || 'Failed'}${data.detail ? ': ' + data.detail : ''}`);
+
+    document.getElementById('deposit-result').innerHTML =
+      `<span style="color:var(--green);font-weight:600;">Deposit request sent!</span> <a href="${esc(data.deposit_payment_link)}" target="_blank" style="color:var(--blue);">View link</a>`;
+    document.getElementById('deposit-existing').innerHTML =
+      `Deposit request: <strong>$${Number(data.deposit_amount).toFixed(2)}</strong> &nbsp;·&nbsp; <span style="color:#92400e;font-weight:600;">Awaiting payment</span> — <a href="${esc(data.deposit_payment_link)}" target="_blank" style="color:var(--blue);">View link</a>`;
+    document.getElementById('deposit-existing').style.display = '';
+    showToast('Deposit request sent to client!', 'success');
+  } catch (err) {
+    showToast(err.message, 'error');
+  } finally {
+    btn.disabled = false; btn.textContent = 'Send Deposit Request';
+  }
 }

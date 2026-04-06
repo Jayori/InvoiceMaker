@@ -33,17 +33,44 @@ function buildEmail({ invoiceNumber, passcode, clientName, business, items, subt
     ? new Date(dueDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
     : 'Upon receipt';
 
-  const itemRows = items.map(item => {
-    const lineTotal = (item.quantity * item.unitPrice).toFixed(2);
+  // Group items by workDate
+  const dated = {}, undated = [];
+  items.forEach(item => {
+    if (item.workDate) {
+      if (!dated[item.workDate]) dated[item.workDate] = [];
+      dated[item.workDate].push(item);
+    } else {
+      undated.push(item);
+    }
+  });
+
+  function buildItemRow(item) {
+    const lineTotal = item.quantity * item.unitPrice;
+    const disc = Math.min(Number(item.discount) || 0, lineTotal);
+    const netTotal = lineTotal - disc;
     const qtyLabel = item.type === 'hours' ? `${item.quantity} hrs` : `x${item.quantity}`;
+    const discountHtml = disc > 0 ? `<div style="font-size:11px;color:#059669;margin-top:2px;">Courtesy discount: -$${disc.toFixed(2)}</div>` : '';
+    const rateHtml = disc > 0
+      ? `<span style="text-decoration:line-through;color:#9ca3af;font-size:12px;">$${Number(item.unitPrice).toFixed(2)}</span>`
+      : `$${Number(item.unitPrice).toFixed(2)}`;
     return `
       <tr>
-        <td style="padding:8px 12px;border-bottom:1px solid #eee;">${escHtml(item.description)}${item.type === 'hours' ? ' <span style="font-size:11px;color:#6b7280;">(hourly)</span>' : ''}</td>
+        <td style="padding:8px 12px;border-bottom:1px solid #eee;">
+          ${escHtml(item.description)}${item.type === 'hours' ? ' <span style="font-size:11px;color:#6b7280;">(hourly)</span>' : ''}
+          ${discountHtml}
+        </td>
         <td style="padding:8px 12px;border-bottom:1px solid #eee;text-align:center;color:#6b7280;">${qtyLabel}</td>
-        <td style="padding:8px 12px;border-bottom:1px solid #eee;text-align:right;">$${Number(item.unitPrice).toFixed(2)}</td>
-        <td style="padding:8px 12px;border-bottom:1px solid #eee;text-align:right;font-weight:500;">$${lineTotal}</td>
+        <td style="padding:8px 12px;border-bottom:1px solid #eee;text-align:right;">${rateHtml}</td>
+        <td style="padding:8px 12px;border-bottom:1px solid #eee;text-align:right;font-weight:500;">$${netTotal.toFixed(2)}</td>
       </tr>`;
-  }).join('');
+  }
+
+  let itemRows = undated.map(buildItemRow).join('');
+  Object.keys(dated).sort().forEach(date => {
+    const dateStr = new Date(date + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+    itemRows += `<tr><td colspan="4" style="padding:10px 12px 4px;background:#f9fafb;font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:0.04em;border-top:1px solid #e5e7eb;">Work: ${escHtml(dateStr)}</td></tr>`;
+    itemRows += dated[date].map(buildItemRow).join('');
+  });
 
   const businessBlock = [
     business.name,
@@ -145,12 +172,16 @@ exports.handler = async (event) => {
   let body;
   try { body = JSON.parse(event.body); } catch { return { statusCode: 400, body: JSON.stringify({ error: 'Invalid JSON' }) }; }
 
-  const { clientName, clientEmail, clientPhone, clientCompany, clientAddress, items, taxRate = 0, notes, dueDate, sendSmsNotification } = body;
+  const { clientName, clientEmail, clientPhone, clientCompany, clientAddress, items, taxRate = 0, notes, dueDate, sendSmsNotification, receiptPhotos } = body;
   if (!clientName || !clientEmail || !items?.length) {
     return { statusCode: 400, body: JSON.stringify({ error: 'clientName, clientEmail, and at least one item are required' }) };
   }
 
-  const subtotal = items.reduce((s, i) => s + i.quantity * i.unitPrice, 0);
+  const subtotal = items.reduce((s, i) => {
+    const lineTotal = i.quantity * i.unitPrice;
+    const disc = Math.min(Number(i.discount) || 0, lineTotal);
+    return s + lineTotal - disc;
+  }, 0);
   const taxAmount = subtotal * (taxRate / 100);
   const total = subtotal + taxAmount;
   const invoiceNumber = generateInvoiceNumber();
@@ -178,11 +209,16 @@ exports.handler = async (event) => {
   // Create Square payment link
   let squarePaymentLink = null, squareOrderId = null;
   try {
-    const lineItems = items.map(item => ({
-      name: item.description.substring(0, 100),
-      quantity: String(item.quantity),
-      basePriceMoney: { amount: BigInt(Math.round(item.unitPrice * 100)), currency: 'USD' },
-    }));
+    const lineItems = items.map(item => {
+      const lineTotal = item.quantity * item.unitPrice;
+      const disc = Math.min(Number(item.discount) || 0, lineTotal);
+      const netTotal = lineTotal - disc;
+      // If discounted, collapse to qty=1 at net price; otherwise keep original qty+rate
+      if (disc > 0) {
+        return { name: item.description.substring(0, 100), quantity: '1', basePriceMoney: { amount: BigInt(Math.round(netTotal * 100)), currency: 'USD' } };
+      }
+      return { name: item.description.substring(0, 100), quantity: String(item.quantity), basePriceMoney: { amount: BigInt(Math.round(item.unitPrice * 100)), currency: 'USD' } };
+    });
     if (taxRate > 0) {
       lineItems.push({ name: `Tax (${taxRate}%)`, quantity: '1', basePriceMoney: { amount: BigInt(Math.round(taxAmount * 100)), currency: 'USD' } });
     }
@@ -202,7 +238,7 @@ exports.handler = async (event) => {
   // Save to Supabase
   const { data: invoice, error: dbError } = await supabase
     .from('invoices')
-    .insert({ invoice_number: invoiceNumber, passcode, client_name: clientName, client_email: clientEmail, client_phone: clientPhone || null, client_company: clientCompany || null, client_address: clientAddress || null, items, subtotal, tax_rate: taxRate, tax_amount: taxAmount, total, notes: notes || null, due_date: dueDate || null, square_payment_link: squarePaymentLink, square_order_id: squareOrderId })
+    .insert({ invoice_number: invoiceNumber, passcode, client_name: clientName, client_email: clientEmail, client_phone: clientPhone || null, client_company: clientCompany || null, client_address: clientAddress || null, items, subtotal, tax_rate: taxRate, tax_amount: taxAmount, total, notes: notes || null, due_date: dueDate || null, square_payment_link: squarePaymentLink, square_order_id: squareOrderId, receipt_photos: receiptPhotos?.length ? receiptPhotos : null })
     .select().single();
 
   if (dbError) return { statusCode: 502, body: JSON.stringify({ error: 'Failed to save invoice', detail: dbError.message }) };

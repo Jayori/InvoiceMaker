@@ -51,20 +51,23 @@ exports.handler = async (event) => {
     const paymentId = payment.id;
 
     if (orderId) {
+      // Update invoice if this order matches one
       const { error } = await supabase
         .from('invoices')
-        .update({
-          status: 'paid',
-          square_payment_id: paymentId,
-          paid_at: new Date().toISOString(),
-        })
+        .update({ status: 'paid', square_payment_id: paymentId, paid_at: new Date().toISOString() })
         .eq('square_order_id', orderId)
         .eq('status', 'pending');
 
       if (error) {
-        console.error('Supabase update error:', error);
-        return { statusCode: 502, body: 'DB error' };
+        console.error('Supabase invoice update error:', error);
       }
+
+      // Update estimate deposit if this order matches a deposit
+      await supabase
+        .from('estimates')
+        .update({ deposit_paid: true })
+        .eq('deposit_order_id', orderId)
+        .eq('deposit_paid', false);
     }
   }
 
