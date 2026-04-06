@@ -255,6 +255,9 @@
 
             <div class="form-actions">
               <button type="button" class="btn btn-secondary" onclick="resetInvoiceForm()">Clear</button>
+              <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px;color:var(--gray-600);">
+                <input type="checkbox" id="inv-send-sms"> Also text client
+              </label>
               <button type="submit" class="btn btn-primary" id="submit-btn">Send Invoice & Payment Link</button>
             </div>
           </form>
@@ -418,6 +421,9 @@
 
             <div class="form-actions">
               <button type="button" class="btn btn-secondary" onclick="resetEstimateForm()">Clear</button>
+              <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px;color:var(--gray-600);">
+                <input type="checkbox" id="est-send-sms"> Also text client
+              </label>
               <button type="submit" class="btn btn-primary" id="est-submit-btn">Send Estimate</button>
             </div>
           </form>

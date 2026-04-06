@@ -2,6 +2,7 @@ const { SquareClient, SquareEnvironment } = require('square');
 const { Resend } = require('resend');
 const { createClient } = require('@supabase/supabase-js');
 const crypto = require('crypto');
+const { sendSms } = require('./send-sms');
 
 const square = new SquareClient({
   token: process.env.SQUARE_ACCESS_TOKEN,
@@ -144,7 +145,7 @@ exports.handler = async (event) => {
   let body;
   try { body = JSON.parse(event.body); } catch { return { statusCode: 400, body: JSON.stringify({ error: 'Invalid JSON' }) }; }
 
-  const { clientName, clientEmail, clientPhone, clientCompany, clientAddress, items, taxRate = 0, notes, dueDate } = body;
+  const { clientName, clientEmail, clientPhone, clientCompany, clientAddress, items, taxRate = 0, notes, dueDate, sendSmsNotification } = body;
   if (!clientName || !clientEmail || !items?.length) {
     return { statusCode: 400, body: JSON.stringify({ error: 'clientName, clientEmail, and at least one item are required' }) };
   }
@@ -215,6 +216,15 @@ exports.handler = async (event) => {
       html: buildEmail({ invoiceNumber, passcode, clientName, business: business || {}, items, subtotal, taxRate, taxAmount, total, dueDate, notes, paymentLink: squarePaymentLink }),
     });
   } catch (err) { console.error('Resend error:', err); }
+
+  // Send SMS if requested and phone provided
+  if (sendSmsNotification && clientPhone) {
+    const appUrl = process.env.APP_URL || '';
+    const bizName = business?.name || 'Us';
+    const msg = `Invoice from ${bizName}: $${total.toFixed(2)} due. View & pay at ${appUrl}/client.html — Code: ${passcode}`;
+    const smsResult = await sendSms(clientPhone, msg);
+    if (!smsResult.success) console.error('SMS error:', smsResult.error);
+  }
 
   return { statusCode: 200, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(invoice) };
 };

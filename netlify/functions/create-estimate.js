@@ -1,5 +1,6 @@
 const { Resend } = require('resend');
 const { createClient } = require('@supabase/supabase-js');
+const { sendSms } = require('./send-sms');
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
@@ -23,7 +24,7 @@ exports.handler = async (event) => {
   let body;
   try { body = JSON.parse(event.body); } catch { return { statusCode: 400, body: JSON.stringify({ error: 'Invalid JSON' }) }; }
 
-  const { clientName, clientEmail, clientPhone, clientCompany, clientAddress, items, taxRate = 0, notes } = body;
+  const { clientName, clientEmail, clientPhone, clientCompany, clientAddress, items, taxRate = 0, notes, sendSmsNotification } = body;
   if (!clientName || !clientEmail || !items?.length) {
     return { statusCode: 400, body: JSON.stringify({ error: 'clientName, clientEmail, and items required' }) };
   }
@@ -92,6 +93,14 @@ exports.handler = async (event) => {
       html: buildEstimateEmail({ estimate, passcode, business: business || {}, appUrl }),
     });
   } catch (err) { console.error('Resend error:', err); }
+
+  // Send SMS if requested and phone provided
+  if (sendSmsNotification && clientPhone) {
+    const bizName = business?.name || 'Us';
+    const msg = `Estimate from ${bizName}: $${total.toFixed(2)}. View & respond at ${appUrl}/client.html — Code: ${passcode}`;
+    const smsResult = await sendSms(clientPhone, msg);
+    if (!smsResult.success) console.error('SMS error:', smsResult.error);
+  }
 
   return {
     statusCode: 200,

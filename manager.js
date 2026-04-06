@@ -264,6 +264,7 @@ async function submitInvoice(e) {
     taxRate,
     notes: document.getElementById('notes').value.trim(),
     dueDate: document.getElementById('due-date').value || null,
+    sendSmsNotification: document.getElementById('inv-send-sms').checked,
   };
 
   // Optionally save client
@@ -848,6 +849,7 @@ async function submitEstimate(e) {
     items,
     taxRate,
     notes: document.getElementById('est-notes').value.trim(),
+    sendSmsNotification: document.getElementById('est-send-sms').checked,
   };
 
   if (document.getElementById('est-save-client-check').checked) {
