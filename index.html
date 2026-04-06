@@ -25,25 +25,11 @@
     </div>
 
     <div class="landing-card">
-      <div class="landing-tagline" id="landing-tagline"></div>
-
       <a href="client.html" class="landing-btn">Pay Here</a>
-
       <p class="landing-sub">Have an invoice? Click above to enter your passcode and pay securely.</p>
-
       <!-- Hidden manager access dot -->
       <a href="manager.html" class="manager-dot" title="Manager access"></a>
     </div>
   </div>
-
-  <script>
-    fetch('/api/get-business-profile')
-      .then(r => r.json())
-      .then(biz => {
-        document.title = biz.name || 'InvoiceMePro';
-        if (biz.tagline) document.getElementById('landing-tagline').textContent = biz.tagline;
-      })
-      .catch(() => {});
-  </script>
 </body>
 </html>

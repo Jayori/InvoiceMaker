@@ -39,10 +39,12 @@ async function verifyPin(e) {
   }
 }
 
+let businessProfilesCache = [];
+
 function initManager() {
   document.getElementById('pin-modal').style.display = 'none';
   document.getElementById('manager-app').style.display = '';
-  loadBusinessProfile();
+  loadBusinessProfiles();
   loadInvoices();
   loadEstimates();
   loadClients();
@@ -55,12 +57,6 @@ document.addEventListener('DOMContentLoaded', () => {
   if (sessionStorage.getItem('mgr_auth') === '1') {
     initManager();
   }
-  // Load biz name on PIN screen too
-  fetch('/api/get-business-profile').then(r => r.json()).then(b => {
-    const n = b.name || 'Invoice Pro';
-    const el = document.getElementById('pin-biz-name');
-    if (el) el.textContent = n;
-  }).catch(() => {});
 });
 
 // ─── Tab switching ─────────────────────────────────────────────────────────────
@@ -72,33 +68,90 @@ function showTab(name, link) {
   if (link) link.classList.add('active');
   if (name === 'dashboard') { loadInvoices(); loadEstimates(); }
   if (name === 'clients') loadClients();
-  if (name === 'settings') loadBusinessProfile();
+  if (name === 'settings') loadBusinessProfiles();
 }
 
-// ─── Business profile ─────────────────────────────────────────────────────────
+// ─── Business profiles ────────────────────────────────────────────────────────
 
-async function loadBusinessProfile() {
+async function loadBusinessProfiles() {
   try {
-    const res = await fetch('/api/get-business-profile');
-    const biz = await res.json();
-    document.getElementById('biz-name').value = biz.name || '';
-    document.getElementById('biz-tagline').value = biz.tagline || '';
-    document.getElementById('biz-email').value = biz.email || '';
-    document.getElementById('biz-phone').value = biz.phone || '';
-    document.getElementById('biz-address').value = biz.address || '';
-    document.getElementById('biz-city').value = biz.city || '';
-    document.getElementById('biz-state').value = biz.state || '';
-    document.getElementById('biz-zip').value = biz.zip || '';
-    const name = biz.name || 'Invoice Pro';
-    document.title = `Manager — ${name}`;
-    const brandEl = document.getElementById('mgr-biz-name');
-    if (brandEl) brandEl.textContent = name;
+    const res = await fetch('/api/get-business-profiles');
+    const profiles = await res.json();
+    businessProfilesCache = Array.isArray(profiles) ? profiles : [];
+    renderBusinessProfilesList();
+    populateBusinessDropdowns();
   } catch {}
 }
 
+function populateBusinessDropdowns() {
+  const opts = businessProfilesCache.map(p =>
+    `<option value="${p.id}">${p.nickname || p.name}</option>`
+  ).join('');
+  ['inv-business-select', 'est-business-select'].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const current = el.value;
+    el.innerHTML = '<option value="">— Select a business profile —</option>' + opts;
+    if (current) el.value = current;
+  });
+}
+
+function renderBusinessProfilesList() {
+  const container = document.getElementById('biz-profiles-list');
+  if (!container) return;
+  if (!businessProfilesCache.length) {
+    container.innerHTML = '<p style="color:var(--gray-500);font-size:14px;">No profiles yet. Add one below.</p>';
+    return;
+  }
+  container.innerHTML = businessProfilesCache.map(p => `
+    <div class="card" style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px;">
+      <div>
+        <div style="font-weight:600;font-size:15px;color:var(--gray-900);">${escHtmlJs(p.nickname || p.name)}</div>
+        <div style="font-size:13px;color:var(--gray-500);margin-top:2px;">${escHtmlJs(p.name)}${p.email ? ' · ' + escHtmlJs(p.email) : ''}${p.phone ? ' · ' + escHtmlJs(p.phone) : ''}</div>
+      </div>
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-secondary btn-sm" onclick="editBizProfile('${p.id}')">Edit</button>
+        <button class="btn btn-sm" style="background:#fee2e2;color:#dc2626;border:none;" onclick="deleteBizProfile('${p.id}')">Delete</button>
+      </div>
+    </div>`).join('');
+}
+
+function editBizProfile(id) {
+  const p = businessProfilesCache.find(x => x.id === id);
+  if (!p) return;
+  document.getElementById('biz-edit-id').value = p.id;
+  document.getElementById('biz-nickname').value = p.nickname || '';
+  document.getElementById('biz-name').value = p.name || '';
+  document.getElementById('biz-tagline').value = p.tagline || '';
+  document.getElementById('biz-email').value = p.email || '';
+  document.getElementById('biz-phone').value = p.phone || '';
+  document.getElementById('biz-address').value = p.address || '';
+  document.getElementById('biz-city').value = p.city || '';
+  document.getElementById('biz-state').value = p.state || '';
+  document.getElementById('biz-zip').value = p.zip || '';
+  document.getElementById('biz-form-title').textContent = 'Edit Business Profile';
+  document.getElementById('biz-cancel-btn').style.display = '';
+  document.getElementById('biz-name').scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+function cancelEditBizProfile() {
+  document.getElementById('biz-edit-id').value = '';
+  ['biz-nickname','biz-name','biz-tagline','biz-email','biz-phone','biz-address','biz-city','biz-state','biz-zip'].forEach(id => {
+    document.getElementById(id).value = '';
+  });
+  document.getElementById('biz-form-title').textContent = 'Add New Business Profile';
+  document.getElementById('biz-cancel-btn').style.display = 'none';
+}
+
 async function saveBusinessProfile() {
+  const nickname = document.getElementById('biz-nickname').value.trim();
+  const name = document.getElementById('biz-name').value.trim();
+  if (!nickname || !name) { showToast('Nickname and Business Name are required.', 'error'); return; }
+  const id = document.getElementById('biz-edit-id').value;
   const fields = {
-    name: document.getElementById('biz-name').value.trim(),
+    id: id || undefined,
+    nickname,
+    name,
     tagline: document.getElementById('biz-tagline').value.trim(),
     email: document.getElementById('biz-email').value.trim(),
     phone: document.getElementById('biz-phone').value.trim(),
@@ -116,11 +169,28 @@ async function saveBusinessProfile() {
     if (res.ok) {
       const msgEl = document.getElementById('biz-saved-msg');
       msgEl.style.display = '';
-      const brandEl = document.getElementById('mgr-biz-name');
-      if (brandEl) brandEl.textContent = fields.name || 'Invoice Pro';
       setTimeout(() => { msgEl.style.display = 'none'; }, 3000);
-    }
+      cancelEditBizProfile();
+      loadBusinessProfiles();
+    } else { showToast('Failed to save.', 'error'); }
   } catch { showToast('Failed to save.', 'error'); }
+}
+
+async function deleteBizProfile(id) {
+  if (!confirm('Delete this business profile?')) return;
+  try {
+    const res = await fetch('/api/delete-business-profile', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id }),
+    });
+    if (res.ok) loadBusinessProfiles();
+    else showToast('Failed to delete.', 'error');
+  } catch { showToast('Failed to delete.', 'error'); }
+}
+
+function escHtmlJs(str) {
+  return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
 // ─── Invoice list ──────────────────────────────────────────────────────────────
@@ -291,6 +361,7 @@ async function submitInvoice(e) {
   const payload = {
     clientName: document.getElementById('client-name').value.trim(),
     clientEmail: document.getElementById('client-email').value.trim(),
+    businessProfileId: document.getElementById('inv-business-select').value || null,
     clientPhone: buildPhone('client-phone-cc', 'client-phone'),
     clientCompany: document.getElementById('client-company').value.trim(),
     clientAddress: document.getElementById('client-address').value.trim(),
@@ -928,6 +999,7 @@ async function submitEstimate(e) {
   const payload = {
     clientName: document.getElementById('est-client-name').value.trim(),
     clientEmail: document.getElementById('est-client-email').value.trim(),
+    businessProfileId: document.getElementById('est-business-select').value || null,
     clientPhone: buildPhone('est-client-phone-cc', 'est-client-phone'),
     clientCompany: document.getElementById('est-client-company').value.trim(),
     clientAddress: document.getElementById('est-client-address').value.trim(),
@@ -961,6 +1033,7 @@ async function submitEstimate(e) {
       payload.estimateId = currentEditEstimateId;
       payload.resendEmail = document.getElementById('est-send-email').checked;
       payload.resendSms = document.getElementById('est-send-sms').checked;
+      payload.businessProfileId = document.getElementById('est-business-select').value || null;
     }
     const res = await fetch(url, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },

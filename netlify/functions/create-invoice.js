@@ -176,7 +176,7 @@ exports.handler = async (event) => {
   let body;
   try { body = JSON.parse(event.body); } catch { return { statusCode: 400, body: JSON.stringify({ error: 'Invalid JSON' }) }; }
 
-  const { clientName, clientEmail, clientPhone, clientCompany, clientAddress, clientCity, clientState, clientZip, items, taxRate = 0, notes, dueDate, sendEmail = true, sendSmsNotification, receiptPhotos } = body;
+  const { clientName, clientEmail, clientPhone, clientCompany, clientAddress, clientCity, clientState, clientZip, items, taxRate = 0, notes, dueDate, sendEmail = true, sendSmsNotification, receiptPhotos, businessProfileId } = body;
   if (!clientName || !clientEmail || !items?.length) {
     return { statusCode: 400, body: JSON.stringify({ error: 'clientName, clientEmail, and at least one item are required' }) };
   }
@@ -208,7 +208,15 @@ exports.handler = async (event) => {
   }
 
   // Fetch business profile
-  const { data: business = {} } = await supabase.from('business_profile').select('*').eq('id', 1).single();
+  let business = {};
+  if (businessProfileId) {
+    const { data } = await supabase.from('business_profiles').select('*').eq('id', businessProfileId).single();
+    if (data) business = data;
+  }
+  if (!business.name) {
+    const { data } = await supabase.from('business_profile').select('*').eq('id', 1).single();
+    if (data) business = data;
+  }
 
   // Create Square payment link
   let squarePaymentLink = null, squareOrderId = null;
@@ -242,7 +250,7 @@ exports.handler = async (event) => {
   // Save to Supabase
   const { data: invoice, error: dbError } = await supabase
     .from('invoices')
-    .insert({ invoice_number: invoiceNumber, passcode, client_name: clientName, client_email: clientEmail, client_phone: clientPhone || null, client_company: clientCompany || null, client_address: clientAddress || null, client_city: clientCity || null, client_state: clientState || null, client_zip: clientZip || null, items, subtotal, tax_rate: taxRate, tax_amount: taxAmount, total, notes: notes || null, due_date: dueDate || null, square_payment_link: squarePaymentLink, square_order_id: squareOrderId, receipt_photos: receiptPhotos?.length ? receiptPhotos : null })
+    .insert({ invoice_number: invoiceNumber, passcode, client_name: clientName, client_email: clientEmail, client_phone: clientPhone || null, client_company: clientCompany || null, client_address: clientAddress || null, client_city: clientCity || null, client_state: clientState || null, client_zip: clientZip || null, items, subtotal, tax_rate: taxRate, tax_amount: taxAmount, total, notes: notes || null, due_date: dueDate || null, square_payment_link: squarePaymentLink, square_order_id: squareOrderId, receipt_photos: receiptPhotos?.length ? receiptPhotos : null, business_profile_id: businessProfileId || null })
     .select().single();
 
   if (dbError) return { statusCode: 502, body: JSON.stringify({ error: 'Failed to save invoice', detail: dbError.message }) };

@@ -15,7 +15,7 @@ exports.handler = async (event) => {
   let body;
   try { body = JSON.parse(event.body); } catch { return { statusCode: 400, body: JSON.stringify({ error: 'Invalid JSON' }) }; }
 
-  const { estimateId, clientName, clientEmail, clientPhone, clientCompany, clientAddress, clientCity, clientState, clientZip, items, taxRate = 0, notes, receiptPhotos, resendEmail, resendSms } = body;
+  const { estimateId, clientName, clientEmail, clientPhone, clientCompany, clientAddress, clientCity, clientState, clientZip, items, taxRate = 0, notes, receiptPhotos, resendEmail, resendSms, businessProfileId } = body;
   if (!estimateId || !clientName || !clientEmail || !items?.length) {
     return { statusCode: 400, body: JSON.stringify({ error: 'estimateId, clientName, clientEmail, and items required' }) };
   }
@@ -54,12 +54,22 @@ exports.handler = async (event) => {
     notes: notes || null,
   };
   if (receiptPhotos !== undefined) update.receipt_photos = receiptPhotos?.length ? receiptPhotos : null;
+  if (businessProfileId !== undefined) update.business_profile_id = businessProfileId || null;
 
   const { data: estimate, error: dbError } = await supabase.from('estimates').update(update).eq('id', estimateId).select().single();
   if (dbError) return { statusCode: 502, body: JSON.stringify({ error: dbError.message }) };
 
   if (resendEmail) {
-    const { data: business = {} } = await supabase.from('business_profile').select('*').eq('id', 1).single();
+    let business = {};
+    const bpId = businessProfileId || existing.business_profile_id;
+    if (bpId) {
+      const { data } = await supabase.from('business_profiles').select('*').eq('id', bpId).single();
+      if (data) business = data;
+    }
+    if (!business.name) {
+      const { data } = await supabase.from('business_profile').select('*').eq('id', 1).single();
+      if (data) business = data;
+    }
     const { data: clientRow } = await supabase.from('clients').select('passcode').eq('email', normalizedEmail).maybeSingle();
     const passcode = clientRow?.passcode || '';
     const appUrl = process.env.APP_URL || '';

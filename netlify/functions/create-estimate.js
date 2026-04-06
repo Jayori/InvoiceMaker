@@ -24,7 +24,7 @@ exports.handler = async (event) => {
   let body;
   try { body = JSON.parse(event.body); } catch { return { statusCode: 400, body: JSON.stringify({ error: 'Invalid JSON' }) }; }
 
-  const { clientName, clientEmail, clientPhone, clientCompany, clientAddress, clientCity, clientState, clientZip, items, taxRate = 0, notes, sendEmail = true, sendSmsNotification, receiptPhotos } = body;
+  const { clientName, clientEmail, clientPhone, clientCompany, clientAddress, clientCity, clientState, clientZip, items, taxRate = 0, notes, sendEmail = true, sendSmsNotification, receiptPhotos, businessProfileId } = body;
   if (!clientName || !clientEmail || !items?.length) {
     return { statusCode: 400, body: JSON.stringify({ error: 'clientName, clientEmail, and items required' }) };
   }
@@ -81,12 +81,21 @@ exports.handler = async (event) => {
       estimated_completion_date: estimatedCompletionDate,
       notes: notes || null,
       receipt_photos: receiptPhotos?.length ? receiptPhotos : null,
+      business_profile_id: businessProfileId || null,
     })
     .select().single();
 
   if (error) return { statusCode: 502, body: JSON.stringify({ error: error.message }) };
 
-  const { data: business = {} } = await supabase.from('business_profile').select('*').eq('id', 1).single();
+  let business = {};
+  if (businessProfileId) {
+    const { data } = await supabase.from('business_profiles').select('*').eq('id', businessProfileId).single();
+    if (data) business = data;
+  }
+  if (!business.name) {
+    const { data } = await supabase.from('business_profile').select('*').eq('id', 1).single();
+    if (data) business = data;
+  }
   const appUrl = process.env.APP_URL || '';
 
   if (sendEmail) {

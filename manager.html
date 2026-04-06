@@ -186,6 +186,16 @@
 
           <form id="invoice-form" onsubmit="submitInvoice(event)">
 
+            <!-- From Business -->
+            <div class="card">
+              <div class="card-title">From Business</div>
+              <div class="form-group">
+                <select id="inv-business-select" style="width:100%;">
+                  <option value="">— Select a business profile —</option>
+                </select>
+              </div>
+            </div>
+
             <!-- Client -->
             <div class="card">
               <div class="card-title">Client</div>
@@ -425,6 +435,16 @@
 
           <form id="estimate-form" onsubmit="submitEstimate(event)">
 
+            <!-- From Business -->
+            <div class="card">
+              <div class="card-title">From Business</div>
+              <div class="form-group">
+                <select id="est-business-select" style="width:100%;">
+                  <option value="">— Select a business profile —</option>
+                </select>
+              </div>
+            </div>
+
             <div class="card">
               <div class="card-title">Client</div>
               <div class="form-grid">
@@ -573,12 +593,21 @@
 
         <!-- Settings -->
         <div id="tab-settings" class="mgr-tab" style="display:none;">
-          <h1 class="section-title" style="margin-bottom:24px;">Business Profile</h1>
+          <h1 class="section-title" style="margin-bottom:24px;">Business Profiles</h1>
 
+          <!-- Saved profiles list -->
+          <div id="biz-profiles-list" style="display:flex;flex-direction:column;gap:12px;margin-bottom:24px;"></div>
+
+          <!-- Add / Edit form -->
           <div class="card">
-            <div class="card-title">Your Business Info</div>
-            <p style="font-size:13px;color:var(--gray-500);margin-bottom:20px;">This info appears on every invoice you send.</p>
+            <div class="card-title" id="biz-form-title">Add New Business Profile</div>
+            <p style="font-size:13px;color:var(--gray-500);margin-bottom:20px;">This info appears on invoices and estimates sent from this business.</p>
+            <input type="hidden" id="biz-edit-id">
             <div class="form-grid">
+              <div class="form-group full">
+                <label>Nickname (for your reference) *</label>
+                <input type="text" id="biz-nickname" placeholder="e.g. Main Business, Side Hustle">
+              </div>
               <div class="form-group">
                 <label>Business Name *</label>
                 <input type="text" id="biz-name" placeholder="My Business LLC">
@@ -613,6 +642,7 @@
               </div>
             </div>
             <div class="form-actions" style="margin-top:20px;">
+              <button type="button" class="btn btn-secondary" id="biz-cancel-btn" style="display:none;" onclick="cancelEditBizProfile()">Cancel</button>
               <button type="button" class="btn btn-primary" onclick="saveBusinessProfile()">Save Profile</button>
             </div>
             <div id="biz-saved-msg" style="display:none;margin-top:12px;color:var(--green);font-size:14px;font-weight:500;">Profile saved!</div>
