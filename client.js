@@ -82,6 +82,11 @@ function showProfile(client, invoices, estimates, justPaid, passcode) {
     if (inv.receipt_photos?.length) window._invPhotosMap[inv.id] = inv.receipt_photos;
   });
 
+  // Hide client-wrap and override body layout so cdash fills the viewport cleanly
+  const wrap = document.querySelector('.client-wrap');
+  if (wrap) wrap.style.display = 'none';
+  document.body.classList.add('has-cdash');
+
   const dash = document.getElementById('client-dash');
   if (!dash) return;
   dash.style.display = 'flex';
