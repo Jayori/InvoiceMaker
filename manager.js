@@ -753,6 +753,88 @@ function handlePreviewOverlayClick(e) {
   if (e.target === document.getElementById('inv-preview-modal')) closePreviewModal();
 }
 
+function previewEstimate(id) {
+  const est = estimatesCache.find(e => e.id === id);
+  if (!est) { showToast('Estimate not found.', 'error'); return; }
+
+  const biz = businessProfilesCache.find(p => p.id === est.business_profile_id);
+  const bizName = biz?.name || 'InvoiceMePro';
+
+  const statusLabel = est.status === 'approved' ? 'Approved' : est.status === 'rejected' ? 'Declined' : 'Awaiting Response';
+  const statusColor = est.status === 'approved' ? '#059669' : est.status === 'rejected' ? '#dc2626' : '#d97706';
+  const statusBg   = est.status === 'approved' ? '#ecfdf5' : est.status === 'rejected' ? '#fef2f2' : '#fffbeb';
+
+  const completion = est.estimated_completion_date
+    ? new Date(est.estimated_completion_date + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })
+    : null;
+
+  const itemRows = (est.items || []).map(item => {
+    const hasQty = item.quantity != null && item.unitPrice != null;
+    const net = Number(item.cost || 0);
+    const disc = Math.min(Number(item.discount) || 0, net);
+    const qtyLine = hasQty
+      ? `<div style="font-size:12px;color:var(--gray-400);margin-top:2px;">${item.type === 'hours' ? `${item.quantity} hrs` : `×${item.quantity}`} @ $${Number(item.unitPrice).toFixed(2)}</div>`
+      : '';
+    const discLine = disc > 0 ? `<div style="font-size:12px;color:#059669;margin-top:1px;">✓ Discount: -$${disc.toFixed(2)}</div>` : '';
+    const explLine = item.explanation ? `<div style="font-size:12px;color:var(--gray-500);margin-top:2px;">${esc(item.explanation)}</div>` : '';
+    const dateLine = item.completionDate ? `<div style="font-size:11px;color:var(--gray-400);margin-top:2px;">End: ${new Date(item.completionDate + 'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}</div>` : '';
+    return `<div style="display:flex;justify-content:space-between;align-items:flex-start;padding:10px 0;border-bottom:1px solid var(--gray-100);gap:12px;">
+      <div style="flex:1;">
+        <div style="font-weight:500;color:var(--gray-900);">${esc(item.description)}</div>
+        ${qtyLine}${discLine}${explLine}${dateLine}
+      </div>
+      <div style="font-weight:600;color:var(--gray-900);white-space:nowrap;">$${net.toFixed(2)}</div>
+    </div>`;
+  }).join('');
+
+  const taxRow = est.tax_rate > 0
+    ? `<div class="inv-totals-row"><span>Tax (${est.tax_rate}%)</span><span>$${Number(est.tax_amount).toFixed(2)}</span></div>` : '';
+
+  const depositHtml = est.deposit_amount
+    ? `<div style="margin-top:14px;padding:12px 16px;background:#eff6ff;border-radius:8px;border:1px solid #bfdbfe;">
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:#1e40af;margin-bottom:2px;">Deposit Required to Start</div>
+        <div style="font-size:22px;font-weight:800;color:#1a56db;">$${Number(est.deposit_amount).toFixed(2)}</div>
+       </div>` : '';
+
+  const photos = est.receipt_photos || [];
+  window._previewPhotos = photos;
+  const photosHtml = photos.length
+    ? `<div style="margin-top:16px;"><div class="inv-label" style="margin-bottom:8px;">Photos</div>
+       <div class="receipt-photos-wrap">${photos.map((p, i) => `<img src="${esc(p)}" class="receipt-thumb" onclick="openPhotoLightbox(window._previewPhotos,${i})">`).join('')}</div></div>`
+    : '';
+
+  const notesHtml = est.notes
+    ? `<div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--gray-100);"><div class="inv-label">Notes</div><div class="inv-notes-text">${esc(est.notes)}</div></div>` : '';
+
+  document.getElementById('inv-preview-body').innerHTML = `
+    <div class="inv-preview-bizname">${esc(bizName)}</div>
+    <div class="inv-header">
+      <div>
+        <div class="inv-number">${esc(est.estimate_number)}</div>
+        <span style="display:inline-block;padding:3px 10px;border-radius:20px;font-size:12px;font-weight:600;background:${statusBg};color:${statusColor};margin-top:4px;">${statusLabel}</span>
+      </div>
+      <div class="inv-total-big">$${Number(est.total).toFixed(2)}</div>
+    </div>
+    <div class="inv-meta">
+      <div><span class="inv-label">Prepared For</span><span class="inv-val">${esc(est.client_name)}</span></div>
+      ${completion ? `<div><span class="inv-label">Est. Completion</span><span class="inv-val">${completion}</span></div>` : ''}
+    </div>
+    <div style="margin-top:16px;">${itemRows}</div>
+    <div class="inv-totals" style="margin-top:8px;">
+      <div class="inv-totals-row"><span>Subtotal</span><span>$${Number(est.subtotal).toFixed(2)}</span></div>
+      ${taxRow}
+      <div class="inv-totals-row inv-totals-total"><span>Total Estimate</span><span>$${Number(est.total).toFixed(2)}</span></div>
+    </div>
+    ${depositHtml}${notesHtml}${photosHtml}
+  `;
+
+  const footer = document.getElementById('inv-preview-footer');
+  footer.innerHTML = `<span style="font-size:13px;color:var(--gray-500);">Passcode: <code style="background:var(--gray-100);padding:2px 6px;border-radius:4px;letter-spacing:0.1em;">${esc(est.passcode || '—')}</code></span><span class="inv-preview-hint">Client view preview</span>`;
+
+  document.getElementById('inv-preview-modal').classList.add('is-open');
+  document.body.style.overflow = 'hidden';
+}
+
 // ─── Helpers ───────────────────────────────────────────────────────────────────
 
 let toastTimer;
@@ -802,16 +884,16 @@ async function loadEstimates() {
         ? new Date(est.estimated_completion_date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
         : '—';
       const statusColor = est.status === 'approved' ? 'paid' : est.status === 'rejected' ? 'rejected' : 'pending';
-      return `<tr>
+      return `<tr onclick="previewEstimate('${est.id}')" style="cursor:pointer;" title="Click to preview">
         <td><div class="client-name">${esc(est.client_name)}</div><div class="invoice-num">${esc(est.client_email)}</div></td>
         <td>${esc(est.estimate_number)}</td>
+        <td><code style="font-size:13px;letter-spacing:0.1em;background:var(--gray-100);padding:2px 6px;border-radius:4px;">${esc(est.passcode || '—')}</code></td>
         <td>${formatDate(est.created_at)}</td>
         <td>${completion}</td>
         <td class="amount">$${Number(est.total).toFixed(2)}</td>
         <td><span class="badge badge-${statusColor}">${capitalize(est.status)}</span></td>
         <td id="msg-count-${est.id}"><span style="color:var(--gray-400);font-size:12px;">—</span></td>
-        <td style="display:flex;gap:6px;flex-wrap:wrap;">
-          <button class="btn btn-sm btn-secondary" onclick="openEstimateDetail('${est.id}')">View</button>
+        <td style="display:flex;gap:6px;flex-wrap:wrap;" onclick="event.stopPropagation()">
           <button class="btn btn-sm btn-secondary" onclick="editEstimate('${est.id}')">Edit</button>
           <button class="btn btn-sm" style="background:#fee2e2;color:#dc2626;border:none;" onclick="deleteEstimate('${est.id}')">Delete</button>
           ${est.status === 'approved' ? `<button class="btn btn-sm btn-primary" onclick="openEstimateDetail('${est.id}')" title="Convert to invoice" style="background:#0f766e;">Invoice →</button>` : ''}

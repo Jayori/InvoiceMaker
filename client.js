@@ -79,12 +79,13 @@ function showProfile(client, invoices, estimates, justPaid, passcode) {
   if (featured) {
     renderInvoiceDetails(featured, justPaid);
   } else {
-    document.getElementById('inv-header').style.display = 'none';
-    document.getElementById('inv-meta').style.display = 'none';
-    const tbl = document.querySelector('.inv-items-table');
-    if (tbl) tbl.style.display = 'none';
-    document.getElementById('inv-totals').style.display = 'none';
-    document.getElementById('pay-section').style.display = 'none';
+    // No invoices — hide the invoice display area entirely
+    ['.inv-header', '.inv-meta', '.inv-items-table'].forEach(sel => {
+      const el = document.querySelector(sel); if (el) el.style.display = 'none';
+    });
+    ['inv-totals', 'pay-section', 'paid-notice', 'history-section'].forEach(id => {
+      const el = document.getElementById(id); if (el) el.style.display = 'none';
+    });
   }
 
   showHistoryFromList(invoices, featured?.id);
