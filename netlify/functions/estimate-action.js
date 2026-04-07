@@ -24,15 +24,9 @@ exports.handler = async (event) => {
 
   const code = passcode.toUpperCase().trim();
 
-  // Allow the estimate's own passcode field OR a matching client record passcode
-  const estimatePasscodeMatch = estimate.passcode && estimate.passcode === code;
-  let clientPasscodeMatch = false;
-  if (!estimatePasscodeMatch) {
-    const { data: client } = await supabase.from('clients').select('passcode').eq('email', estimate.client_email).maybeSingle();
-    clientPasscodeMatch = !!(client && client.passcode === code);
-  }
-
-  if (!estimatePasscodeMatch && !clientPasscodeMatch) {
+  // Look up client by passcode directly (avoids email case-mismatch issues)
+  const { data: client } = await supabase.from('clients').select('id, email').eq('passcode', code).maybeSingle();
+  if (!client || client.email.toLowerCase() !== estimate.client_email.toLowerCase()) {
     return { statusCode: 403, body: JSON.stringify({ error: 'Invalid access code' }) };
   }
 
