@@ -285,15 +285,24 @@ function renderEstimates(estimates) {
     const isPending = est.status === 'pending';
     const dateStr = est.created_at ? new Date(est.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '';
 
-    const itemRows = (est.items || []).map(item => `
-      <div class="est-item-row">
+    const itemRows = (est.items || []).map(item => {
+      const hasQty = item.quantity != null && item.unitPrice != null;
+      const qtyLabel = hasQty
+        ? (item.type === 'hours' ? `${item.quantity} hrs @ $${Number(item.unitPrice).toFixed(2)}` : `×${item.quantity} @ $${Number(item.unitPrice).toFixed(2)}`)
+        : '';
+      const disc = Math.min(Number(item.discount) || 0, Number(item.cost));
+      const discRow = disc > 0 ? `<div class="est-item-expl" style="color:#059669;">✓ Courtesy discount: -$${disc.toFixed(2)}</div>` : '';
+      return `<div class="est-item-row">
         <div class="est-item-info">
-          <div class="est-item-desc">${esc(item.description)}</div>
+          <div class="est-item-desc">${esc(item.description)}${item.type === 'hours' ? ' <span class="item-type-tag">hourly</span>' : ''}</div>
+          ${qtyLabel ? `<div class="est-item-expl" style="color:var(--gray-400);">${qtyLabel}</div>` : ''}
+          ${discRow}
           ${item.explanation ? `<div class="est-item-expl">${esc(item.explanation)}</div>` : ''}
           ${item.estimatedDays ? `<div class="est-item-days">Est. ${item.estimatedDays} day${Number(item.estimatedDays) !== 1 ? 's' : ''}</div>` : ''}
         </div>
         <div class="est-item-cost">$${Number(item.cost).toFixed(2)}</div>
-      </div>`).join('');
+      </div>`;
+    }).join('');
 
     const messages = est.messages || [];
     const chatHtml = messages.length ? `

@@ -1041,24 +1041,27 @@ const EST_TYPES = [
   { value: 'other', label: 'Other' },
 ];
 
-function addEstimateItem(desc = '', explanation = '', type = 'item', cost = '', days = '') {
+function addEstimateItem(desc = '', explanation = '', type = 'item', qty = 1, unitPrice = '', discount = '', days = '') {
   const id = ++estItemId;
   const typeOptions = EST_TYPES.map(t => `<option value="${t.value}"${t.value === type ? ' selected' : ''}>${t.label}</option>`).join('');
   const tr = document.createElement('tr');
   tr.id = `est-item-${id}`;
   tr.innerHTML = `
-    <td><select style="width:100%;">${typeOptions}</select></td>
+    <td><select id="est-type-${id}" style="width:100%;">${typeOptions}</select></td>
     <td>
-      <input type="text" placeholder="Description" value="${escAttr(desc)}" required oninput="recalcEstimateTotals()" style="width:100%;margin-bottom:4px;">
+      <input type="text" id="est-desc-${id}" placeholder="Description" value="${escAttr(desc)}" required oninput="recalcEstimateTotals()" style="width:100%;margin-bottom:4px;">
       <textarea id="est-expl-${id}" placeholder="Explain why (optional)..." style="width:100%;min-height:44px;font-size:12px;resize:vertical;">${escAttr(explanation)}</textarea>
     </td>
-    <td><input type="number" id="est-cost-${id}" value="${escAttr(cost)}" placeholder="0.00" min="0" step="0.01" required oninput="recalcEstimateTotals()" style="width:90px;"></td>
+    <td><input type="number" id="est-qty-${id}" value="${escAttr(qty)}" min="0.01" step="any" oninput="recalcEstimateTotals()" style="width:100%;"></td>
+    <td><input type="number" id="est-price-${id}" value="${escAttr(unitPrice)}" placeholder="0.00" min="0" step="0.01" oninput="recalcEstimateTotals()" style="width:100%;"></td>
+    <td><input type="number" id="est-disc-${id}" value="${escAttr(discount)}" placeholder="0.00" min="0" step="0.01" oninput="recalcEstimateTotals()" style="width:100%;"></td>
     <td>
       <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:13px;">
         <input type="checkbox" id="est-days-toggle-${id}" onchange="toggleEstimateDays(${id},this)"${days ? ' checked' : ''}> Days
       </label>
       <input type="number" id="est-days-${id}" value="${escAttr(days)}" placeholder="0" min="1" step="1" oninput="recalcEstimateTotals()" style="width:70px;margin-top:4px;${days ? '' : 'display:none;'}">
     </td>
+    <td style="text-align:right;font-weight:500;white-space:nowrap;" id="est-line-total-${id}">$0.00</td>
     <td><button type="button" class="remove-item-btn" onclick="removeEstimateItem(${id})">&#x2715;</button></td>
   `;
   document.getElementById('est-items-tbody').appendChild(tr);
@@ -1078,23 +1081,34 @@ function removeEstimateItem(id) {
 
 function getEstimateItems() {
   return Array.from(document.getElementById('est-items-tbody').querySelectorAll('tr')).map(row => {
-    const sel = row.querySelector('select');
-    const inputs = row.querySelectorAll('input[type=text], textarea');
-    const costInput = row.querySelector('input[type=number][placeholder="0.00"]');
-    const daysToggle = row.querySelector('input[type=checkbox]');
-    const daysInput = row.querySelector('input[type=number][placeholder="0"]');
+    const id = row.id.replace('est-item-', '');
+    const qty = parseFloat(document.getElementById(`est-qty-${id}`)?.value) || 1;
+    const unitPrice = parseFloat(document.getElementById(`est-price-${id}`)?.value) || 0;
+    const lineTotal = qty * unitPrice;
+    const discount = Math.min(parseFloat(document.getElementById(`est-disc-${id}`)?.value) || 0, lineTotal);
+    const cost = lineTotal - discount;
+    const daysToggle = document.getElementById(`est-days-toggle-${id}`);
     return {
-      type: sel?.value || 'item',
-      description: inputs[0]?.value.trim() || '',
-      explanation: inputs[1]?.value.trim() || '',
-      cost: parseFloat(costInput?.value) || 0,
-      estimatedDays: daysToggle?.checked ? (parseInt(daysInput?.value) || 0) : 0,
+      type: document.getElementById(`est-type-${id}`)?.value || 'item',
+      description: document.getElementById(`est-desc-${id}`)?.value.trim() || '',
+      explanation: document.getElementById(`est-expl-${id}`)?.value.trim() || '',
+      quantity: qty,
+      unitPrice,
+      discount,
+      cost,
+      estimatedDays: daysToggle?.checked ? (parseInt(document.getElementById(`est-days-${id}`)?.value) || 0) : 0,
     };
   });
 }
 
 function recalcEstimateTotals() {
   const items = getEstimateItems();
+  // Update per-line totals
+  Array.from(document.getElementById('est-items-tbody').querySelectorAll('tr')).forEach((row, idx) => {
+    const id = row.id.replace('est-item-', '');
+    const el = document.getElementById(`est-line-total-${id}`);
+    if (el) el.textContent = `$${(items[idx]?.cost || 0).toFixed(2)}`;
+  });
   const useTax = document.getElementById('est-tax-toggle')?.checked;
   const taxRate = useTax ? (parseFloat(document.getElementById('est-tax-rate')?.value) || 0) : 0;
   const subtotal = items.reduce((s, i) => s + i.cost, 0);
@@ -1344,7 +1358,13 @@ function editEstimate(id) {
   // Items
   document.getElementById('edit-est-items-tbody').innerHTML = '';
   editEstItemId = 0;
-  (est.items || []).forEach(item => addEditEstimateItem(item.description, item.explanation || '', item.type || 'item', item.cost, item.estimatedDays || ''));
+  (est.items || []).forEach(item => {
+    // Backward compat: old items had only `cost`; new ones have quantity + unitPrice
+    const qty = item.quantity || 1;
+    const unitPrice = item.unitPrice != null ? item.unitPrice : (item.cost || 0);
+    const discount = item.discount || 0;
+    addEditEstimateItem(item.description, item.explanation || '', item.type || 'item', qty, unitPrice, discount, item.estimatedDays || '');
+  });
   recalcEditEstimateTotals();
 
   loadEditPhotos(est.receipt_photos);
@@ -1487,45 +1507,59 @@ function toggleEditTax() {
 }
 
 // Edit tab line items — estimate
-function addEditEstimateItem(desc = '', explanation = '', type = 'item', cost = '', days = '') {
+function addEditEstimateItem(desc = '', explanation = '', type = 'item', qty = 1, unitPrice = '', discount = '', days = '') {
   const id = ++editEstItemId;
   const typeOptions = ITEM_TYPES.map(t => `<option value="${t.value}"${t.value === type ? ' selected' : ''}>${t.label}</option>`).join('');
   const tr = document.createElement('tr');
   tr.id = `edit-est-item-${id}`;
   tr.innerHTML = `
-    <td><select style="width:100%;">${typeOptions}</select></td>
+    <td><select id="edit-est-type-${id}" style="width:100%;">${typeOptions}</select></td>
     <td>
       <input type="text" id="edit-est-desc-${id}" value="${escHtmlJs(desc)}" placeholder="Description" style="width:100%;margin-bottom:4px;">
       <input type="text" id="edit-est-expl-${id}" value="${escHtmlJs(explanation)}" placeholder="Explanation (optional)" style="width:100%;font-size:12px;color:var(--gray-500);">
     </td>
-    <td><input type="number" id="edit-est-cost-${id}" value="${cost}" min="0" step="0.01" oninput="recalcEditEstimateTotals()" placeholder="0.00" style="width:100%;"></td>
-    <td><input type="number" id="edit-est-days-${id}" value="${days}" min="0" step="1" oninput="recalcEditEstimateTotals()" placeholder="0" style="width:100%;"></td>
+    <td><input type="number" id="edit-est-qty-${id}" value="${escHtmlJs(qty)}" min="0.01" step="any" oninput="recalcEditEstimateTotals()" style="width:100%;"></td>
+    <td><input type="number" id="edit-est-price-${id}" value="${escHtmlJs(unitPrice)}" min="0" step="0.01" oninput="recalcEditEstimateTotals()" placeholder="0.00" style="width:100%;"></td>
+    <td><input type="number" id="edit-est-disc-${id}" value="${escHtmlJs(discount)}" min="0" step="0.01" oninput="recalcEditEstimateTotals()" placeholder="0.00" style="width:100%;"></td>
+    <td><input type="number" id="edit-est-days-${id}" value="${escHtmlJs(days)}" min="0" step="1" oninput="recalcEditEstimateTotals()" placeholder="0" style="width:100%;"></td>
+    <td style="text-align:right;font-weight:500;white-space:nowrap;" id="edit-est-line-total-${id}">$0.00</td>
     <td><button type="button" onclick="document.getElementById('edit-est-item-${id}').remove();recalcEditEstimateTotals();" style="background:none;border:none;cursor:pointer;color:var(--gray-400);font-size:18px;">×</button></td>`;
   document.getElementById('edit-est-items-tbody').appendChild(tr);
   recalcEditEstimateTotals();
 }
 
 function getEditEstimateItems() {
-  const rows = document.querySelectorAll('#edit-est-items-tbody tr');
-  return Array.from(rows).map(row => {
+  return Array.from(document.querySelectorAll('#edit-est-items-tbody tr')).map(row => {
     const id = row.id.replace('edit-est-item-', '');
+    const qty = parseFloat(document.getElementById(`edit-est-qty-${id}`)?.value) || 1;
+    const unitPrice = parseFloat(document.getElementById(`edit-est-price-${id}`)?.value) || 0;
+    const lineTotal = qty * unitPrice;
+    const discount = Math.min(parseFloat(document.getElementById(`edit-est-disc-${id}`)?.value) || 0, lineTotal);
+    const cost = lineTotal - discount;
     return {
+      type: document.getElementById(`edit-est-type-${id}`)?.value || 'item',
       description: document.getElementById(`edit-est-desc-${id}`)?.value.trim() || '',
       explanation: document.getElementById(`edit-est-expl-${id}`)?.value.trim() || '',
-      cost: parseFloat(document.getElementById(`edit-est-cost-${id}`)?.value) || 0,
+      quantity: qty,
+      unitPrice,
+      discount,
+      cost,
       estimatedDays: parseFloat(document.getElementById(`edit-est-days-${id}`)?.value) || 0,
     };
   }).filter(i => i.description);
 }
 
 function recalcEditEstimateTotals() {
+  const items = getEditEstimateItems();
+  // Update per-line totals
+  Array.from(document.querySelectorAll('#edit-est-items-tbody tr')).forEach((row, idx) => {
+    const id = row.id.replace('edit-est-item-', '');
+    const el = document.getElementById(`edit-est-line-total-${id}`);
+    if (el) el.textContent = `$${(items[idx]?.cost || 0).toFixed(2)}`;
+  });
   const useTax = document.getElementById('edit-est-tax-toggle').checked;
   const taxRate = useTax ? (parseFloat(document.getElementById('edit-est-tax-rate').value) || 0) : 0;
-  let subtotal = 0;
-  document.querySelectorAll('#edit-est-items-tbody tr').forEach(row => {
-    const id = row.id.replace('edit-est-item-', '');
-    subtotal += parseFloat(document.getElementById(`edit-est-cost-${id}`)?.value) || 0;
-  });
+  const subtotal = items.reduce((s, i) => s + i.cost, 0);
   const taxAmt = subtotal * (taxRate / 100);
   document.getElementById('edit-est-subtotal-display').textContent = `$${subtotal.toFixed(2)}`;
   const taxRow = document.getElementById('edit-est-tax-row');
