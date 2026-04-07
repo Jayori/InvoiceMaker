@@ -3,18 +3,17 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Pay Invoice</title>
+  <title>My Account</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body class="client-body">
 
   <div class="client-wrap">
-
     <!-- Passcode entry -->
     <div id="passcode-view" class="client-card">
       <div class="client-biz-name" id="client-biz-name">Invoice Pro</div>
       <h2 class="client-heading">Enter Your Access Code</h2>
-      <p class="client-sub">Your 6-character code was emailed to you when your first invoice was sent.</p>
+      <p class="client-sub">Your 6-character code was emailed to you when your first invoice or estimate was sent.</p>
 
       <form onsubmit="lookupInvoice(event)">
         <input type="text" id="passcode-input" class="passcode-input"
@@ -24,20 +23,17 @@
           autocapitalize="characters"
           spellcheck="false"
           required>
-        <button type="submit" class="btn btn-primary btn-block" id="lookup-btn">View My Invoices</button>
+        <button type="submit" class="btn btn-primary btn-block" id="lookup-btn">View My Account</button>
       </form>
 
       <div id="lookup-error" class="client-error" style="display:none;"></div>
-
-      <a href="index.html" class="client-back">← Back</a>
+      <a href="index.html" class="client-back">&#8592; Back</a>
     </div>
 
-    <!-- Invoice view -->
+    <!-- Legacy invoice view (old per-invoice passcode fallback) -->
     <div id="invoice-view" class="client-card" style="display:none;">
       <div class="client-biz-name" id="invoice-biz-name">Invoice Pro</div>
-
       <div id="inv-client-greeting" class="inv-client-greeting" style="display:none;"></div>
-
       <div class="inv-header">
         <div>
           <div class="inv-number" id="inv-number"></div>
@@ -45,86 +41,96 @@
         </div>
         <div class="inv-total-big" id="inv-total-big"></div>
       </div>
-
       <div class="inv-meta">
         <div><span class="inv-label">Billed To</span><span class="inv-val" id="inv-client"></span></div>
         <div><span class="inv-label">Due Date</span><span class="inv-val" id="inv-due"></span></div>
       </div>
-
       <table class="inv-items-table">
-        <thead>
-          <tr>
-            <th>Description</th>
-            <th style="text-align:center;">Qty</th>
-            <th style="text-align:right;">Rate</th>
-            <th style="text-align:right;">Total</th>
-          </tr>
-        </thead>
+        <thead><tr>
+          <th>Description</th>
+          <th style="text-align:center;">Qty</th>
+          <th style="text-align:right;">Rate</th>
+          <th style="text-align:right;">Total</th>
+        </tr></thead>
         <tbody id="inv-items-tbody"></tbody>
       </table>
-
       <div class="inv-totals">
         <div class="inv-totals-row"><span>Subtotal</span><span id="inv-subtotal"></span></div>
         <div class="inv-totals-row" id="inv-tax-row" style="display:none;"><span id="inv-tax-label">Tax</span><span id="inv-tax-amount"></span></div>
         <div class="inv-totals-row inv-totals-total"><span>Total Due</span><span id="inv-total"></span></div>
       </div>
-
-      <div id="inv-notes-section" style="display:none;">
-        <div class="inv-label">Notes</div>
-        <div id="inv-notes" class="inv-notes-text"></div>
-      </div>
-
+      <div id="inv-notes-section" style="display:none;"><div class="inv-label">Notes</div><div id="inv-notes" class="inv-notes-text"></div></div>
       <div id="inv-photos-section" style="display:none;margin-top:20px;"></div>
-
       <div id="pay-section" style="margin-top:28px;text-align:center;">
         <a id="pay-btn" href="#" class="btn btn-primary btn-block btn-pay" target="_blank">Pay Now</a>
         <p style="margin:10px 0 0;font-size:13px;color:var(--gray-400);">Secure payment powered by Square</p>
       </div>
-
-      <div id="paid-notice" class="paid-notice" style="display:none;">
-        Payment received — thank you!
-      </div>
-
-      <!-- Pending estimates -->
-      <div id="estimates-section" style="display:none;margin-top:32px;">
-        <div class="inv-history-title">Estimates</div>
-        <div id="estimates-list"></div>
-      </div>
-
-      <!-- Invoice history for this client -->
+      <div id="paid-notice" class="paid-notice" style="display:none;">Payment received &#8212; thank you!</div>
       <div id="history-section" style="display:none;margin-top:32px;">
         <div class="inv-history-title">Your Invoice History</div>
         <div id="history-loading" style="font-size:13px;color:var(--gray-400);padding:12px 0;">Loading...</div>
         <div id="history-list"></div>
       </div>
-
-      <a href="client.html" class="client-back" style="margin-top:24px;display:block;">← Look up a different invoice</a>
+      <a href="client.html" class="client-back" style="margin-top:24px;display:block;">&#8592; Look up a different invoice</a>
     </div>
-
   </div>
 
-  <!-- Profile view (two-section: estimates + invoices) -->
-  <div id="profile-view" class="profile-outer" style="display:none;">
-    <div class="client-biz-name profile-biz-name"></div>
-    <div id="profile-greeting" class="profile-greeting"></div>
+  <!-- Full-page client dashboard (replaces profile-view) -->
+  <div id="client-dash" class="cdash" style="display:none;">
 
-    <div id="profile-est-section" class="profile-section" style="display:none;">
-      <div class="profile-section-head">
-        <span class="profile-section-title">Estimates</span>
-        <span id="profile-est-badge" class="profile-section-badge"></span>
+    <!-- Sidebar / bottom nav -->
+    <nav class="cdash-nav">
+      <div class="cdash-nav-brand">
+        <div class="cdash-nav-biz client-biz-name"></div>
       </div>
-      <div id="profile-est-list"></div>
-    </div>
 
-    <div id="profile-inv-section" class="profile-section" style="display:none;">
-      <div class="profile-section-head">
-        <span class="profile-section-title">Invoices</span>
-        <span id="profile-inv-badge" class="profile-section-badge"></span>
+      <button class="cdash-nav-item active" id="cnav-home" onclick="cdashTab('home',this)">
+        <svg class="cdash-nav-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+        <span>Dashboard</span>
+      </button>
+
+      <button class="cdash-nav-item" id="cnav-invoices" onclick="cdashTab('invoices',this)">
+        <svg class="cdash-nav-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+        <span>Invoices</span>
+        <span id="cnav-inv-badge" class="cdash-nav-badge" style="display:none;"></span>
+      </button>
+
+      <button class="cdash-nav-item" id="cnav-estimates" onclick="cdashTab('estimates',this)">
+        <svg class="cdash-nav-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/></svg>
+        <span>Estimates</span>
+        <span id="cnav-est-badge" class="cdash-nav-badge" style="display:none;"></span>
+      </button>
+
+      <div class="cdash-nav-spacer"></div>
+
+      <button class="cdash-nav-item cdash-nav-signout" onclick="location.href='client.html'">
+        <svg class="cdash-nav-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
+        <span>Sign Out</span>
+      </button>
+    </nav>
+
+    <!-- Main content area -->
+    <main class="cdash-main" id="cdash-scroll">
+
+      <!-- Dashboard tab -->
+      <div id="cdash-home" class="cdash-tab">
+        <div id="cdash-greeting" class="cdash-greeting"></div>
+        <div id="cdash-home-content"></div>
       </div>
-      <div id="profile-inv-list"></div>
-    </div>
 
-    <a href="client.html" class="client-back" style="margin-top:28px;display:block;">← Use a different code</a>
+      <!-- Invoices tab -->
+      <div id="cdash-invoices" class="cdash-tab" style="display:none;">
+        <h2 class="cdash-tab-title">Invoices</h2>
+        <div id="cdash-inv-list"></div>
+      </div>
+
+      <!-- Estimates tab -->
+      <div id="cdash-estimates" class="cdash-tab" style="display:none;">
+        <h2 class="cdash-tab-title">Estimates</h2>
+        <div id="cdash-est-list"></div>
+      </div>
+
+    </main>
   </div>
 
   <!-- Photo Lightbox -->

@@ -61,7 +61,7 @@ async function loadInvoice(code, justPaid) {
   }
 }
 
-// ── Profile mode ─────────────────────────────────────────────────────────────
+// ── Client Dashboard ──────────────────────────────────────────────────────────
 
 let clientPasscode = '';
 
@@ -70,50 +70,88 @@ function showProfile(client, invoices, estimates, justPaid, passcode) {
   document.getElementById('passcode-view').style.display = 'none';
   document.getElementById('invoice-view').style.display = 'none';
 
-  const pv = document.getElementById('profile-view');
-  if (!pv) return;
-  pv.style.display = '';
-
-  const greetEl = document.getElementById('profile-greeting');
-  if (greetEl) greetEl.textContent = `Hello, ${client.name}`;
-
-  // Store estimates data for post-action updates
+  // Store data globally
   window._estimatesData = {};
+  window._estPhotosMap = {};
+  window._invPhotosMap = {};
   estimates.forEach(est => {
     window._estimatesData[est.id] = est;
-    if (est.receipt_photos?.length) {
-      if (!window._estPhotosMap) window._estPhotosMap = {};
-      window._estPhotosMap[est.id] = est.receipt_photos;
-    }
+    if (est.receipt_photos?.length) window._estPhotosMap[est.id] = est.receipt_photos;
+  });
+  invoices.forEach(inv => {
+    if (inv.receipt_photos?.length) window._invPhotosMap[inv.id] = inv.receipt_photos;
   });
 
-  // Estimates section
-  const estSection = document.getElementById('profile-est-section');
-  const estList = document.getElementById('profile-est-list');
-  if (estimates.length && estSection && estList) {
-    document.getElementById('profile-est-badge').textContent = estimates.length;
-    estSection.style.display = '';
-    estList.innerHTML = estimates.map(est => buildEstimateRow(est)).join('');
-    // Auto-open the first pending estimate
-    const firstPending = estimates.find(e => e.status === 'pending');
-    if (firstPending) toggleProfileRow('est', firstPending.id);
-  } else if (estSection) {
-    estSection.style.display = 'none';
+  const dash = document.getElementById('client-dash');
+  if (!dash) return;
+  dash.style.display = 'flex';
+
+  // Greeting
+  const greetEl = document.getElementById('cdash-greeting');
+  if (greetEl) greetEl.textContent = `Hello, ${client.name}`;
+
+  // Nav badges
+  const unpaid = invoices.filter(i => i.status !== 'paid');
+  const pending = estimates.filter(e => e.status === 'pending');
+  const invBadge = document.getElementById('cnav-inv-badge');
+  const estBadge = document.getElementById('cnav-est-badge');
+  if (unpaid.length) { invBadge.textContent = unpaid.length; invBadge.style.display = ''; }
+  if (pending.length) { estBadge.textContent = pending.length; estBadge.style.display = ''; }
+
+  // Build all three tabs
+  buildDashHome(invoices, estimates, justPaid);
+
+  const invList = document.getElementById('cdash-inv-list');
+  invList.innerHTML = invoices.length
+    ? invoices.map(inv => buildInvoiceRow(inv, justPaid)).join('')
+    : '<p class="cdash-empty">No invoices yet.</p>';
+
+  const estList = document.getElementById('cdash-est-list');
+  estList.innerHTML = estimates.length
+    ? estimates.map(est => buildEstimateRow(est)).join('')
+    : '<p class="cdash-empty">No estimates yet.</p>';
+}
+
+function buildDashHome(invoices, estimates, justPaid) {
+  const container = document.getElementById('cdash-home-content');
+  const depositDue = estimates.filter(e => e.status === 'approved' && e.deposit_amount && !e.deposit_paid);
+  const pendingEsts = estimates.filter(e => e.status === 'pending');
+  const unpaidInvs = invoices.filter(i => i.status !== 'paid');
+
+  if (!depositDue.length && !pendingEsts.length && !unpaidInvs.length) {
+    container.innerHTML = `<div class="cdash-all-clear">
+      <div class="cdash-check">&#10003;</div>
+      <div class="cdash-all-clear-title">You're all caught up!</div>
+      <div class="cdash-all-clear-sub">No pending invoices or estimates right now.</div>
+    </div>`;
+    return;
   }
 
-  // Invoices section
-  const invSection = document.getElementById('profile-inv-section');
-  const invList = document.getElementById('profile-inv-list');
-  if (invoices.length && invSection && invList) {
-    document.getElementById('profile-inv-badge').textContent = invoices.length;
-    invSection.style.display = '';
-    invList.innerHTML = invoices.map(inv => buildInvoiceRow(inv, justPaid)).join('');
-    // Auto-open the first unpaid invoice
-    const firstUnpaid = invoices.find(i => i.status !== 'paid');
-    if (firstUnpaid) toggleProfileRow('inv', firstUnpaid.id);
-  } else if (invSection) {
-    invSection.style.display = 'none';
+  let html = '';
+  if (depositDue.length) {
+    html += `<div class="cdash-section-label">Deposit Due</div>`;
+    html += depositDue.map(est => buildEstimateRow(est)).join('');
   }
+  if (pendingEsts.length) {
+    html += `<div class="cdash-section-label">Awaiting Your Response</div>`;
+    html += pendingEsts.map(est => buildEstimateRow(est)).join('');
+  }
+  if (unpaidInvs.length) {
+    html += `<div class="cdash-section-label">Invoices Due</div>`;
+    html += unpaidInvs.map(inv => buildInvoiceRow(inv, justPaid)).join('');
+  }
+  container.innerHTML = html;
+}
+
+function cdashTab(name, btn) {
+  document.querySelectorAll('.cdash-tab').forEach(t => t.style.display = 'none');
+  document.querySelectorAll('.cdash-nav-item').forEach(n => n.classList.remove('active'));
+  const tab = document.getElementById(`cdash-${name}`);
+  if (tab) tab.style.display = '';
+  if (btn) btn.classList.add('active');
+  else document.getElementById(`cnav-${name}`)?.classList.add('active');
+  const scroll = document.getElementById('cdash-scroll');
+  if (scroll) scroll.scrollTop = 0;
 }
 
 // ── Profile row builders ──────────────────────────────────────────────────────
@@ -213,28 +251,25 @@ function buildEstimateDetailHtml(est) {
     ? `<div style="margin-bottom:12px;"><div class="est-big-label" style="margin-bottom:6px;">Photos</div><div class="receipt-photos-wrap">${est.receipt_photos.map((p, i) => `<img src="${esc(p)}" class="receipt-thumb" onclick="openPhotoLightbox(window._estPhotosMap['${est.id}'],${i})">`).join('')}</div></div>`
     : '';
 
+  // Deposit block — only show when approved (pending estimates show deposit in summary badge only)
   let depositBoxHtml = '';
-  if (est.deposit_paid) {
-    depositBoxHtml = `<div style="margin:12px 0;"><span class="deposit-paid-notice">&#10003; Deposit of $${Number(est.deposit_amount).toFixed(2)} received &mdash; thank you!</span></div>`;
-  } else if (est.deposit_payment_link) {
-    depositBoxHtml = `<div class="deposit-pay-section">
-      <div class="deposit-pay-label">Deposit Required to Start</div>
-      <div class="deposit-pay-amount">$${Number(est.deposit_amount).toFixed(2)}</div>
-      <a href="${esc(est.deposit_payment_link)}" class="deposit-pay-btn" target="_blank">Complete Deposit &rarr;</a>
-      <p style="font-size:12px;color:#3730a3;margin:10px 0 0;">Secure payment powered by Square</p>
-    </div>`;
-  } else if (est.deposit_amount && est.status === 'approved') {
-    depositBoxHtml = `<div style="margin:14px 0;padding:14px 16px;background:#eff6ff;border-radius:10px;border:1px solid #bfdbfe;">
-      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:#1e40af;margin-bottom:4px;">Deposit Required to Start</div>
-      <div style="font-size:24px;font-weight:800;color:#1a56db;">$${Number(est.deposit_amount).toFixed(2)}</div>
-      <div style="font-size:12px;color:#3730a3;margin-top:4px;">Your contractor will send a secure payment link shortly.</div>
-    </div>`;
-  } else if (est.deposit_amount) {
-    depositBoxHtml = `<div style="margin:14px 0;padding:14px 16px;background:#eff6ff;border-radius:10px;border:1px solid #bfdbfe;">
-      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:#1e40af;margin-bottom:4px;">Deposit Required to Start</div>
-      <div style="font-size:24px;font-weight:800;color:#1a56db;">$${Number(est.deposit_amount).toFixed(2)}</div>
-      <div style="font-size:12px;color:#3730a3;margin-top:2px;">Due upon approval of this estimate</div>
-    </div>`;
+  if (est.status === 'approved' && est.deposit_amount) {
+    if (est.deposit_paid) {
+      depositBoxHtml = `<div style="margin:12px 0;"><span class="deposit-paid-notice">&#10003; Deposit of $${Number(est.deposit_amount).toFixed(2)} received &mdash; thank you!</span></div>`;
+    } else if (est.deposit_payment_link) {
+      depositBoxHtml = `<div class="deposit-pay-section" style="text-align:center;" id="deposit-box-${est.id}">
+        <div class="deposit-pay-label">Deposit Required to Start</div>
+        <div class="deposit-pay-amount">$${Number(est.deposit_amount).toFixed(2)}</div>
+        <a href="${esc(est.deposit_payment_link)}" class="deposit-pay-btn" target="_blank">Complete Deposit &rarr;</a>
+        <p style="font-size:12px;color:#3730a3;margin:10px 0 0;">Secure payment powered by Square</p>
+      </div>`;
+    } else {
+      depositBoxHtml = `<div style="margin:14px 0;padding:14px 16px;background:#eff6ff;border-radius:10px;border:1px solid #bfdbfe;" id="deposit-box-${est.id}">
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:#1e40af;margin-bottom:4px;">Deposit Required to Start</div>
+        <div style="font-size:24px;font-weight:800;color:#1a56db;">$${Number(est.deposit_amount).toFixed(2)}</div>
+        <div style="font-size:12px;color:#3730a3;margin-top:4px;">Your contractor will send a secure payment link shortly.</div>
+      </div>`;
+    }
   }
 
   return `
@@ -688,42 +723,55 @@ async function estimateAction(estimateId, action) {
       const depositLink = data.deposit_payment_link;
       const depositAmt = estData?.deposit_amount;
 
-      if (actions) {
-        if (depositLink && depositAmt) {
-          // Replace action buttons with Complete Deposit button
-          actions.outerHTML = `<div style="margin:16px 0;" id="est-actions-${estimateId}">
-            <a href="${esc(depositLink)}" class="btn btn-primary btn-block" style="display:block;text-align:center;padding:14px;font-size:16px;font-weight:700;text-decoration:none;" target="_blank">Complete Deposit &rarr; $${Number(depositAmt).toFixed(2)}</a>
-            <p style="font-size:12px;color:#3730a3;text-align:center;margin:8px 0 0;">Secure payment powered by Square</p>
-          </div>`;
-          // Also update summary row
-          const rightDiv = row?.querySelector('.profile-row-right');
-          if (rightDiv) {
-            const existing = rightDiv.querySelector('.profile-deposit-pending, .profile-deposit-btn');
-            if (existing) existing.remove();
+      // Remove action buttons
+      if (actions) actions.remove();
+      if (msgForm) msgForm.remove();
+
+      // Show deposit block where the actions were (or append to detail)
+      const detail = document.getElementById(`profile-est-detail-${estimateId}`);
+      if (depositAmt && detail) {
+        const existingBox = document.getElementById(`deposit-box-${estimateId}`);
+        const depositHtml = depositLink
+          ? `<div class="deposit-pay-section" style="text-align:center;" id="deposit-box-${estimateId}">
+              <div class="deposit-pay-label">Deposit Required to Start</div>
+              <div class="deposit-pay-amount">$${Number(depositAmt).toFixed(2)}</div>
+              <a href="${esc(depositLink)}" class="deposit-pay-btn" target="_blank">Complete Deposit &rarr;</a>
+              <p style="font-size:12px;color:#3730a3;margin:10px 0 0;">Secure payment powered by Square</p>
+            </div>`
+          : `<div style="margin:14px 0;padding:14px 16px;background:#eff6ff;border-radius:10px;border:1px solid #bfdbfe;" id="deposit-box-${estimateId}">
+              <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:#1e40af;margin-bottom:4px;">Deposit Required to Start</div>
+              <div style="font-size:22px;font-weight:800;color:#1a56db;">$${Number(depositAmt).toFixed(2)}</div>
+              <div style="font-size:12px;color:#3730a3;margin-top:4px;">Your contractor will send a secure payment link shortly.</div>
+            </div>`;
+        if (existingBox) {
+          existingBox.outerHTML = depositHtml;
+        } else {
+          detail.insertAdjacentHTML('beforeend', depositHtml);
+        }
+
+        // Update summary row badge
+        const rightDiv = row?.querySelector('.profile-row-right');
+        if (rightDiv) {
+          const existing = rightDiv.querySelector('.profile-deposit-pending, .profile-deposit-btn');
+          if (existing) existing.remove();
+          if (depositLink) {
             const a = document.createElement('a');
-            a.href = depositLink;
-            a.target = '_blank';
-            a.className = 'profile-deposit-btn';
+            a.href = depositLink; a.target = '_blank'; a.className = 'profile-deposit-btn';
             a.textContent = `Pay $${Number(depositAmt).toFixed(2)} Deposit`;
             a.onclick = e => e.stopPropagation();
             rightDiv.appendChild(a);
+          } else {
+            const span = document.createElement('span');
+            span.className = 'profile-deposit-pending';
+            span.textContent = `Deposit $${Number(depositAmt).toFixed(2)} pending`;
+            rightDiv.appendChild(span);
           }
-        } else if (depositAmt) {
-          // No Square link yet — show pending message in place of buttons
-          actions.outerHTML = `<div style="margin:14px 0;padding:14px 16px;background:#eff6ff;border-radius:10px;border:1px solid #bfdbfe;" id="est-actions-${estimateId}">
-            <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:#1e40af;margin-bottom:4px;">Deposit Required to Start</div>
-            <div style="font-size:22px;font-weight:800;color:#1a56db;">$${Number(depositAmt).toFixed(2)}</div>
-            <div style="font-size:12px;color:#3730a3;margin-top:4px;">Payment link coming shortly.</div>
-          </div>`;
-        } else {
-          actions.remove();
         }
       }
     } else {
       if (actions) actions.remove();
+      if (msgForm) msgForm.remove();
     }
-
-    if (msgForm) msgForm.remove();
   } catch { alert('Something went wrong. Please try again.'); }
 }
 

@@ -579,14 +579,100 @@ textarea { resize: vertical; min-height: 80px; }
 .deposit-paid-notice { background: var(--green-light); border: 1px solid #6ee7b7; color: var(--green); padding: 10px 16px; border-radius: 8px; font-size: 14px; font-weight: 600; display: inline-block; }
 
 /* ═══════════════════════════════════════════════════
-   PROFILE VIEW (two-section client dashboard)
+   CLIENT DASHBOARD
 ═══════════════════════════════════════════════════ */
-.profile-outer { width: 100%; max-width: 680px; margin: 0 auto; padding: 0 0 40px; }
-.profile-greeting { font-size: 22px; font-weight: 800; color: var(--gray-900); margin: 4px 0 24px; }
+.cdash {
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  display: flex; flex-direction: row;
+  background: var(--gray-50); z-index: 50; overflow: hidden;
+}
+
+/* Sidebar */
+.cdash-nav {
+  width: 210px; flex-shrink: 0;
+  background: #fff; border-right: 1px solid var(--gray-200);
+  display: flex; flex-direction: column;
+  padding: 20px 0 16px;
+  overflow-y: auto; height: 100%;
+}
+.cdash-nav-brand { padding: 0 18px 20px; border-bottom: 1px solid var(--gray-100); margin-bottom: 10px; }
+.cdash-nav-biz { font-size: 15px !important; font-weight: 800; color: var(--blue); margin: 0 !important; word-break: break-word; }
+.cdash-nav-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 11px 18px; width: 100%; border: none; background: none;
+  color: var(--gray-500); font-size: 14px; font-weight: 500;
+  cursor: pointer; text-align: left; position: relative;
+  transition: background 0.12s, color 0.12s;
+}
+.cdash-nav-item:hover { background: var(--gray-50); color: var(--gray-800); }
+.cdash-nav-item.active { background: #eff6ff; color: var(--blue); font-weight: 600; }
+.cdash-nav-icon { width: 20px; height: 20px; flex-shrink: 0; }
+.cdash-nav-badge {
+  position: absolute; right: 14px; top: 50%; transform: translateY(-50%);
+  background: var(--blue); color: #fff; font-size: 11px; font-weight: 700;
+  min-width: 18px; height: 18px; border-radius: 9px;
+  display: flex; align-items: center; justify-content: center; padding: 0 4px;
+}
+.cdash-nav-spacer { flex: 1; }
+.cdash-nav-signout { color: var(--gray-400) !important; }
+.cdash-nav-signout:hover { color: var(--gray-600) !important; }
+
+/* Main content */
+.cdash-main {
+  flex: 1; overflow-y: auto; overflow-x: hidden;
+  padding: 32px 36px; min-width: 0;
+}
+.cdash-tab { max-width: 700px; }
+.cdash-tab-title { font-size: 20px; font-weight: 800; color: var(--gray-900); margin: 0 0 20px; }
+.cdash-greeting { font-size: 24px; font-weight: 800; color: var(--gray-900); margin-bottom: 24px; }
+.cdash-section-label {
+  font-size: 11px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.08em; color: var(--gray-400); margin: 20px 0 10px;
+}
+.cdash-section-label:first-child { margin-top: 0; }
+.cdash-empty { color: var(--gray-400); font-size: 14px; padding: 24px 0; }
+.cdash-all-clear {
+  display: flex; flex-direction: column; align-items: center;
+  padding: 48px 24px; text-align: center;
+  background: #fff; border-radius: 14px; border: 1px solid var(--gray-200);
+  color: var(--gray-600); font-size: 16px; font-weight: 600;
+}
+.cdash-check {
+  width: 52px; height: 52px; border-radius: 50%; background: var(--green-light);
+  color: var(--green); font-size: 24px; font-weight: 700;
+  display: flex; align-items: center; justify-content: center; margin-bottom: 14px;
+}
+.cdash-all-clear-title { font-size: 18px; font-weight: 700; color: var(--gray-800); }
+.cdash-all-clear-sub { font-size: 13px; color: var(--gray-400); margin-top: 4px; font-weight: 400; }
+
+/* Mobile: bottom nav */
+@media (max-width: 640px) {
+  .cdash { flex-direction: column; }
+  .cdash-nav {
+    order: 2; width: 100%; height: auto;
+    flex-direction: row; padding: 0;
+    border-right: none; border-top: 1px solid var(--gray-200);
+    position: sticky; bottom: 0; overflow: visible;
+  }
+  .cdash-nav-brand { display: none; }
+  .cdash-nav-spacer { display: none; }
+  .cdash-nav-signout { display: none; }
+  .cdash-nav-item {
+    flex: 1; flex-direction: column; gap: 3px;
+    padding: 8px 4px 10px; font-size: 10px;
+    justify-content: center; text-align: center;
+    border-radius: 0;
+  }
+  .cdash-nav-icon { width: 22px; height: 22px; }
+  .cdash-nav-badge { position: absolute; top: 4px; right: 8px; transform: none; }
+  .cdash-main { order: 1; padding: 20px 16px 16px; }
+  .cdash-greeting { font-size: 20px; }
+}
+
+/* ═══════════════════════════════════════════════════
+   PROFILE ROW (card rows inside dashboard)
+═══════════════════════════════════════════════════ */
 .profile-section { margin-bottom: 28px; }
-.profile-section-head { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; padding-bottom: 10px; border-bottom: 2px solid var(--gray-200); }
-.profile-section-title { font-size: 13px; font-weight: 800; color: var(--gray-600); text-transform: uppercase; letter-spacing: 0.08em; }
-.profile-section-badge { font-size: 11px; background: var(--gray-200); color: var(--gray-600); padding: 2px 8px; border-radius: 20px; font-weight: 700; }
 .profile-row { border: 1px solid var(--gray-200); border-radius: 12px; margin-bottom: 10px; overflow: hidden; transition: box-shadow 0.15s; background: #fff; }
 .profile-row:hover { box-shadow: 0 2px 12px rgba(0,0,0,0.07); }
 .profile-row-summary { display: flex; align-items: center; padding: 14px 16px; cursor: pointer; gap: 10px; }
