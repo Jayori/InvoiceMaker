@@ -1123,7 +1123,7 @@ const EST_TYPES = [
   { value: 'other', label: 'Other' },
 ];
 
-function addEstimateItem(desc = '', explanation = '', type = 'item', qty = 1, unitPrice = '', discount = '', completionDate = '') {
+function addEstimateItem(desc = '', explanation = '', type = 'item', qty = 1, unitPrice = '', discount = '', completionDate = '', depositPct = '') {
   const id = ++estItemId;
   const typeOptions = EST_TYPES.map(t => `<option value="${t.value}"${t.value === type ? ' selected' : ''}>${t.label}</option>`).join('');
   const tr = document.createElement('tr');
@@ -1137,6 +1137,7 @@ function addEstimateItem(desc = '', explanation = '', type = 'item', qty = 1, un
     <td><input type="number" id="est-qty-${id}" value="${escAttr(qty)}" min="0.01" step="any" oninput="recalcEstimateTotals()" style="width:100%;"></td>
     <td><input type="number" id="est-price-${id}" value="${escAttr(unitPrice)}" placeholder="0.00" min="0" step="0.01" oninput="recalcEstimateTotals()" style="width:100%;"></td>
     <td><input type="number" id="est-disc-${id}" value="${escAttr(discount)}" placeholder="0.00" min="0" step="0.01" oninput="recalcEstimateTotals()" style="width:100%;"></td>
+    <td><input type="number" id="est-dep-${id}" value="${escAttr(depositPct)}" placeholder="0" min="0" max="100" step="0.1" oninput="recalcEstimateTotals()" style="width:100%;" title="Deposit % for this item"></td>
     <td><input type="date" id="est-compdate-${id}" value="${escAttr(completionDate)}" onchange="recalcEstimateTotals()" style="width:100%;"></td>
     <td style="text-align:right;font-weight:500;white-space:nowrap;" id="est-line-total-${id}">$0.00</td>
     <td><button type="button" class="remove-item-btn" onclick="removeEstimateItem(${id})">&#x2715;</button></td>
@@ -1164,6 +1165,7 @@ function getEstimateItems() {
     const lineTotal = qty * unitPrice;
     const discount = Math.min(parseFloat(document.getElementById(`est-disc-${id}`)?.value) || 0, lineTotal);
     const cost = lineTotal - discount;
+    const depositPct = parseFloat(document.getElementById(`est-dep-${id}`)?.value) || 0;
     return {
       type: document.getElementById(`est-type-${id}`)?.value || 'item',
       description: document.getElementById(`est-desc-${id}`)?.value.trim() || '',
@@ -1172,6 +1174,7 @@ function getEstimateItems() {
       unitPrice,
       discount,
       cost,
+      depositPct,
       completionDate: document.getElementById(`est-compdate-${id}`)?.value || null,
     };
   });
@@ -1201,6 +1204,17 @@ function recalcEstimateTotals() {
     document.getElementById('est-tax-display').textContent = `$${taxAmount.toFixed(2)}`;
   } else {
     taxRow.style.display = 'none';
+  }
+
+  // Auto-calculate deposit from item deposit percentages
+  const autoDeposit = items.reduce((s, i) => s + (i.cost * (i.depositPct || 0) / 100), 0);
+  const depositInput = document.getElementById('est-deposit');
+  const depositAutoLabel = document.getElementById('est-deposit-auto-label');
+  if (autoDeposit > 0 && depositInput) {
+    depositInput.value = autoDeposit.toFixed(2);
+    if (depositAutoLabel) depositAutoLabel.style.display = '';
+  } else if (depositAutoLabel) {
+    depositAutoLabel.style.display = 'none';
   }
 
   const completionWrap = document.getElementById('est-completion-display');
@@ -1441,7 +1455,7 @@ function editEstimate(id) {
     const discount = item.discount || 0;
     // Backward compat: old items had estimatedDays, new ones have completionDate
     const completionDate = item.completionDate || '';
-    addEditEstimateItem(item.description, item.explanation || '', item.type || 'item', qty, unitPrice, discount, completionDate);
+    addEditEstimateItem(item.description, item.explanation || '', item.type || 'item', qty, unitPrice, discount, completionDate, item.depositPct || 0);
   });
   document.getElementById('edit-est-deposit').value = est.deposit_amount || '';
   recalcEditEstimateTotals();
@@ -1587,7 +1601,7 @@ function toggleEditTax() {
 }
 
 // Edit tab line items — estimate
-function addEditEstimateItem(desc = '', explanation = '', type = 'item', qty = 1, unitPrice = '', discount = '', completionDate = '') {
+function addEditEstimateItem(desc = '', explanation = '', type = 'item', qty = 1, unitPrice = '', discount = '', completionDate = '', depositPct = '') {
   const id = ++editEstItemId;
   const typeOptions = ITEM_TYPES.map(t => `<option value="${t.value}"${t.value === type ? ' selected' : ''}>${t.label}</option>`).join('');
   const tr = document.createElement('tr');
@@ -1601,6 +1615,7 @@ function addEditEstimateItem(desc = '', explanation = '', type = 'item', qty = 1
     <td><input type="number" id="edit-est-qty-${id}" value="${escHtmlJs(qty)}" min="0.01" step="any" oninput="recalcEditEstimateTotals()" style="width:100%;"></td>
     <td><input type="number" id="edit-est-price-${id}" value="${escHtmlJs(unitPrice)}" min="0" step="0.01" oninput="recalcEditEstimateTotals()" placeholder="0.00" style="width:100%;"></td>
     <td><input type="number" id="edit-est-disc-${id}" value="${escHtmlJs(discount)}" min="0" step="0.01" oninput="recalcEditEstimateTotals()" placeholder="0.00" style="width:100%;"></td>
+    <td><input type="number" id="edit-est-dep-${id}" value="${escHtmlJs(depositPct)}" placeholder="0" min="0" max="100" step="0.1" oninput="recalcEditEstimateTotals()" style="width:100%;" title="Deposit % for this item"></td>
     <td><input type="date" id="edit-est-compdate-${id}" value="${escHtmlJs(completionDate)}" onchange="recalcEditEstimateTotals()" style="width:100%;"></td>
     <td style="text-align:right;font-weight:500;white-space:nowrap;" id="edit-est-line-total-${id}">$0.00</td>
     <td><button type="button" onclick="document.getElementById('edit-est-item-${id}').remove();recalcEditEstimateTotals();" style="background:none;border:none;cursor:pointer;color:var(--gray-400);font-size:18px;">×</button></td>`;
@@ -1616,6 +1631,7 @@ function getEditEstimateItems() {
     const lineTotal = qty * unitPrice;
     const discount = Math.min(parseFloat(document.getElementById(`edit-est-disc-${id}`)?.value) || 0, lineTotal);
     const cost = lineTotal - discount;
+    const depositPct = parseFloat(document.getElementById(`edit-est-dep-${id}`)?.value) || 0;
     return {
       type: document.getElementById(`edit-est-type-${id}`)?.value || 'item',
       description: document.getElementById(`edit-est-desc-${id}`)?.value.trim() || '',
@@ -1624,6 +1640,7 @@ function getEditEstimateItems() {
       unitPrice,
       discount,
       cost,
+      depositPct,
       completionDate: document.getElementById(`edit-est-compdate-${id}`)?.value || null,
     };
   }).filter(i => i.description);
@@ -1642,6 +1659,18 @@ function recalcEditEstimateTotals() {
   const subtotal = items.reduce((s, i) => s + i.cost, 0);
   const taxAmt = subtotal * (taxRate / 100);
   document.getElementById('edit-est-subtotal-display').textContent = `$${subtotal.toFixed(2)}`;
+
+  // Auto-calculate deposit from item deposit percentages
+  const autoDeposit = items.reduce((s, i) => s + (i.cost * (i.depositPct || 0) / 100), 0);
+  const editDepInput = document.getElementById('edit-est-deposit');
+  const editDepLabel = document.getElementById('edit-est-deposit-auto-label');
+  if (autoDeposit > 0 && editDepInput) {
+    editDepInput.value = autoDeposit.toFixed(2);
+    if (editDepLabel) editDepLabel.style.display = '';
+  } else if (editDepLabel) {
+    editDepLabel.style.display = 'none';
+  }
+
   const taxRow = document.getElementById('edit-est-tax-row');
   if (taxRow) taxRow.style.display = taxRate > 0 ? '' : 'none';
   document.getElementById('edit-est-tax-display').textContent = `$${taxAmt.toFixed(2)}`;

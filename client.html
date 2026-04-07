@@ -103,6 +103,30 @@
 
   </div>
 
+  <!-- Profile view (two-section: estimates + invoices) -->
+  <div id="profile-view" class="profile-outer" style="display:none;">
+    <div class="client-biz-name profile-biz-name"></div>
+    <div id="profile-greeting" class="profile-greeting"></div>
+
+    <div id="profile-est-section" class="profile-section" style="display:none;">
+      <div class="profile-section-head">
+        <span class="profile-section-title">Estimates</span>
+        <span id="profile-est-badge" class="profile-section-badge"></span>
+      </div>
+      <div id="profile-est-list"></div>
+    </div>
+
+    <div id="profile-inv-section" class="profile-section" style="display:none;">
+      <div class="profile-section-head">
+        <span class="profile-section-title">Invoices</span>
+        <span id="profile-inv-badge" class="profile-section-badge"></span>
+      </div>
+      <div id="profile-inv-list"></div>
+    </div>
+
+    <a href="client.html" class="client-back" style="margin-top:28px;display:block;">← Use a different code</a>
+  </div>
+
   <!-- Photo Lightbox -->
   <div id="photo-lightbox" class="photo-lightbox" onclick="handleLightboxClick(event)">
     <button class="lightbox-close" onclick="closeLightbox()" title="Close">

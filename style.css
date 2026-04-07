@@ -277,7 +277,7 @@ textarea { resize: vertical; min-height: 80px; }
   .invoice-table th, .invoice-table td { padding: 10px 10px; }
   .items-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
   .items-table { min-width: 520px; }
-  #est-items-table, #edit-est-items-table { min-width: 720px; }
+  #est-items-table, #edit-est-items-table { min-width: 800px; }
   #est-table { min-width: 580px; }
 
   /* ── Edit tab ── */
@@ -578,3 +578,30 @@ textarea { resize: vertical; min-height: 80px; }
 .deposit-pay-btn { display: inline-block; background: #1a56db; color: #fff; padding: 12px 28px; border-radius: 8px; font-size: 15px; font-weight: 700; text-decoration: none; }
 .deposit-pay-btn:hover { background: #1e40af; }
 .deposit-paid-notice { background: var(--green-light); border: 1px solid #6ee7b7; color: var(--green); padding: 10px 16px; border-radius: 8px; font-size: 14px; font-weight: 600; display: inline-block; }
+
+/* ═══════════════════════════════════════════════════
+   PROFILE VIEW (two-section client dashboard)
+═══════════════════════════════════════════════════ */
+.profile-outer { width: 100%; max-width: 680px; margin: 0 auto; padding: 0 0 40px; }
+.profile-greeting { font-size: 22px; font-weight: 800; color: var(--gray-900); margin: 4px 0 24px; }
+.profile-section { margin-bottom: 28px; }
+.profile-section-head { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; padding-bottom: 10px; border-bottom: 2px solid var(--gray-200); }
+.profile-section-title { font-size: 13px; font-weight: 800; color: var(--gray-600); text-transform: uppercase; letter-spacing: 0.08em; }
+.profile-section-badge { font-size: 11px; background: var(--gray-200); color: var(--gray-600); padding: 2px 8px; border-radius: 20px; font-weight: 700; }
+.profile-row { border: 1px solid var(--gray-200); border-radius: 12px; margin-bottom: 10px; overflow: hidden; transition: box-shadow 0.15s; background: #fff; }
+.profile-row:hover { box-shadow: 0 2px 12px rgba(0,0,0,0.07); }
+.profile-row-summary { display: flex; align-items: center; padding: 14px 16px; cursor: pointer; gap: 10px; }
+.profile-row-left { flex: 1; min-width: 0; }
+.profile-row-num { font-size: 14px; font-weight: 700; color: var(--gray-900); font-family: monospace; letter-spacing: 0.04em; }
+.profile-row-date { font-size: 12px; color: var(--gray-400); margin-top: 2px; }
+.profile-row-right { display: flex; flex-direction: column; align-items: flex-end; gap: 5px; flex-shrink: 0; }
+.profile-row-amount { font-size: 16px; font-weight: 800; color: var(--gray-900); }
+.profile-row-chevron { font-size: 10px; color: var(--gray-300); flex-shrink: 0; transition: transform 0.2s; }
+.profile-row.is-open .profile-row-chevron { transform: rotate(180deg); }
+.profile-row-detail { padding: 4px 16px 20px; border-top: 1px solid var(--gray-100); }
+.profile-deposit-btn { display: inline-block; padding: 5px 12px; background: #1a56db; color: #fff !important; border-radius: 6px; font-size: 12px; font-weight: 700; text-decoration: none; white-space: nowrap; }
+.profile-deposit-btn:hover { background: #1245b3; }
+.profile-deposit-pending { font-size: 12px; color: #1a56db; font-weight: 600; background: #eff6ff; border: 1px solid #bfdbfe; padding: 3px 8px; border-radius: 6px; white-space: nowrap; }
+.profile-deposit-paid-badge { font-size: 12px; color: var(--green); font-weight: 600; background: var(--green-light); border: 1px solid #a7f3d0; padding: 3px 8px; border-radius: 6px; white-space: nowrap; }
+.profile-pay-btn { display: inline-block; padding: 6px 14px; background: var(--primary); color: #fff !important; border-radius: 7px; font-size: 12px; font-weight: 700; text-decoration: none; white-space: nowrap; }
+.profile-pay-btn:hover { background: var(--primary-dark); }
