@@ -82,8 +82,9 @@ textarea { resize: vertical; min-height: 80px; }
 .badge-cancelled { background: var(--gray-100); color: var(--gray-500); }
 
 /* ─── Line items ──────────────────────────────────── */
-.items-table-wrap { overflow-x: auto; }
+.items-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 .items-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+#est-items-table, #edit-est-items-table { min-width: 720px; }
 .items-table th { text-align: left; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--gray-500); padding: 0 8px 10px; }
 .items-table td { padding: 6px 8px; }
 .items-table input, .items-table select { width: 100%; }
@@ -276,6 +277,7 @@ textarea { resize: vertical; min-height: 80px; }
   .invoice-table th, .invoice-table td { padding: 10px 10px; }
   .items-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
   .items-table { min-width: 520px; }
+  #est-items-table, #edit-est-items-table { min-width: 720px; }
   #est-table { min-width: 580px; }
 
   /* ── Edit tab ── */
