@@ -227,11 +227,13 @@ async function loadInvoices() {
         <td>${inv.due_date ? formatDate(inv.due_date) : '—'}</td>
         <td class="amount">$${Number(inv.total).toFixed(2)}</td>
         <td><span class="badge badge-${inv.status}">${capitalize(inv.status)}</span></td>
-        <td style="display:flex;gap:6px;flex-wrap:wrap;" onclick="event.stopPropagation()">
-          ${inv.square_payment_link ? `<a href="${esc(inv.square_payment_link)}" target="_blank" class="btn btn-sm btn-secondary">Link</a>` : ''}
-          <button class="btn btn-sm btn-secondary" onclick="editInvoice('${inv.id}')">Edit</button>
-          <button class="btn btn-sm" style="background:#fee2e2;color:#dc2626;border:none;" onclick="deleteInvoice('${inv.id}')">Delete</button>
-          <button class="btn btn-sm btn-secondary" onclick="saveClientFromRow('${escAttr(inv.client_name)}','${escAttr(inv.client_email)}','${escAttr(inv.client_phone||'')}','${escAttr(inv.client_company||'')}','${escAttr(inv.client_address||'')}','${escAttr(inv.client_city||'')}','${escAttr(inv.client_state||'')}','${escAttr(inv.client_zip||'')}')" title="Save client to contacts">+ Client</button>
+        <td onclick="event.stopPropagation()" style="white-space:nowrap;">
+          <div style="display:flex;gap:6px;flex-wrap:nowrap;align-items:center;">
+            ${inv.square_payment_link ? `<a href="${esc(inv.square_payment_link)}" target="_blank" class="btn btn-sm btn-secondary">Link</a>` : ''}
+            <button class="btn btn-sm btn-secondary" onclick="editInvoice('${inv.id}')">Edit</button>
+            <button class="btn btn-sm" style="background:#fee2e2;color:#dc2626;border:none;" onclick="deleteInvoice('${inv.id}')">Delete</button>
+            <button class="btn btn-sm btn-secondary" onclick="saveClientFromRow('${escAttr(inv.client_name)}','${escAttr(inv.client_email)}','${escAttr(inv.client_phone||'')}','${escAttr(inv.client_company||'')}','${escAttr(inv.client_address||'')}','${escAttr(inv.client_city||'')}','${escAttr(inv.client_state||'')}','${escAttr(inv.client_zip||'')}')" title="Save client to contacts">+ Client</button>
+          </div>
         </td>
       </tr>`).join('');
     table.style.display = '';
@@ -893,11 +895,13 @@ async function loadEstimates() {
         <td class="amount">$${Number(est.total).toFixed(2)}</td>
         <td><span class="badge badge-${statusColor}">${capitalize(est.status)}</span></td>
         <td id="msg-count-${est.id}"><span style="color:var(--gray-400);font-size:12px;">—</span></td>
-        <td style="display:flex;gap:6px;flex-wrap:wrap;" onclick="event.stopPropagation()">
-          <button class="btn btn-sm btn-secondary" onclick="editEstimate('${est.id}')">Edit</button>
-          <button class="btn btn-sm" style="background:#fee2e2;color:#dc2626;border:none;" onclick="deleteEstimate('${est.id}')">Delete</button>
-          ${est.status === 'approved' ? `<button class="btn btn-sm btn-primary" onclick="openEstimateDetail('${est.id}')" title="Convert to invoice" style="background:#0f766e;">Invoice →</button>` : ''}
-          <button class="btn btn-sm btn-secondary" onclick="saveClientFromRow('${escAttr(est.client_name)}','${escAttr(est.client_email)}','${escAttr(est.client_phone||'')}','${escAttr(est.client_company||'')}','${escAttr(est.client_address||'')}','${escAttr(est.client_city||'')}','${escAttr(est.client_state||'')}','${escAttr(est.client_zip||'')}')" title="Save client to contacts">+ Client</button>
+        <td onclick="event.stopPropagation()" style="white-space:nowrap;">
+          <div style="display:flex;gap:6px;flex-wrap:nowrap;align-items:center;">
+            <button class="btn btn-sm btn-secondary" onclick="editEstimate('${est.id}')">Edit</button>
+            <button class="btn btn-sm" style="background:#fee2e2;color:#dc2626;border:none;" onclick="deleteEstimate('${est.id}')">Delete</button>
+            ${est.status === 'approved' ? `<button class="btn btn-sm btn-primary" onclick="openEstimateDetail('${est.id}')" title="Convert to invoice" style="background:#0f766e;">Invoice →</button>` : ''}
+            <button class="btn btn-sm btn-secondary" onclick="saveClientFromRow('${escAttr(est.client_name)}','${escAttr(est.client_email)}','${escAttr(est.client_phone||'')}','${escAttr(est.client_company||'')}','${escAttr(est.client_address||'')}','${escAttr(est.client_city||'')}','${escAttr(est.client_state||'')}','${escAttr(est.client_zip||'')}')" title="Save client to contacts">+ Client</button>
+          </div>
         </td>
       </tr>`;
     }).join('');
