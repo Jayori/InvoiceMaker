@@ -22,8 +22,17 @@ exports.handler = async (event) => {
   const { data: estimate } = await supabase.from('estimates').select('*').eq('id', estimateId).single();
   if (!estimate) return { statusCode: 404, body: JSON.stringify({ error: 'Estimate not found' }) };
 
-  const { data: client } = await supabase.from('clients').select('passcode').eq('email', estimate.client_email).maybeSingle();
-  if (!client || client.passcode !== passcode.toUpperCase().trim()) {
+  const code = passcode.toUpperCase().trim();
+
+  // Allow the estimate's own passcode field OR a matching client record passcode
+  const estimatePasscodeMatch = estimate.passcode && estimate.passcode === code;
+  let clientPasscodeMatch = false;
+  if (!estimatePasscodeMatch) {
+    const { data: client } = await supabase.from('clients').select('passcode').eq('email', estimate.client_email).maybeSingle();
+    clientPasscodeMatch = !!(client && client.passcode === code);
+  }
+
+  if (!estimatePasscodeMatch && !clientPasscodeMatch) {
     return { statusCode: 403, body: JSON.stringify({ error: 'Invalid access code' }) };
   }
 
