@@ -1,8 +1,14 @@
 const { Resend } = require('resend');
 const { createClient } = require('@supabase/supabase-js');
+const { SquareClient, SquareEnvironment } = require('square');
+const crypto = require('crypto');
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
+const square = new SquareClient({
+  token: process.env.SQUARE_ACCESS_TOKEN,
+  environment: process.env.SQUARE_ENVIRONMENT === 'production' ? SquareEnvironment.Production : SquareEnvironment.Sandbox,
+});
 
 function escHtml(str) {
   return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
@@ -35,7 +41,36 @@ exports.handler = async (event) => {
 
   if (action === 'approve' || action === 'reject') {
     const newStatus = action === 'approve' ? 'approved' : 'rejected';
-    await supabase.from('estimates').update({ status: newStatus }).eq('id', estimateId);
+
+    // If approving with a deposit amount, auto-create Square payment link
+    let depositPaymentLink = null;
+    if (action === 'approve' && estimate.deposit_amount && Number(estimate.deposit_amount) > 0 && !estimate.deposit_payment_link) {
+      try {
+        const result = await square.checkout.paymentLinks.create({
+          idempotencyKey: crypto.randomUUID(),
+          order: {
+            locationId: process.env.SQUARE_LOCATION_ID,
+            referenceId: `DEPOSIT-${estimate.estimate_number}`,
+            lineItems: [{
+              name: `Deposit — ${estimate.estimate_number}`.substring(0, 100),
+              quantity: '1',
+              basePriceMoney: { amount: BigInt(Math.round(Number(estimate.deposit_amount) * 100)), currency: 'USD' },
+            }],
+          },
+          checkoutOptions: { redirectUrl: `${appUrl}/client.html?paid=${code}` },
+        });
+        depositPaymentLink = result.paymentLink.url;
+      } catch (err) {
+        console.error('Square deposit link error (non-fatal):', err);
+      }
+    }
+
+    const updateFields = { status: newStatus };
+    if (depositPaymentLink) {
+      updateFields.deposit_payment_link = depositPaymentLink;
+      updateFields.deposit_paid = false;
+    }
+    await supabase.from('estimates').update(updateFields).eq('id', estimateId);
 
     if (business?.email) {
       const word = action === 'approve' ? 'APPROVED ✓' : 'DECLINED';
@@ -55,7 +90,7 @@ exports.handler = async (event) => {
       } catch (err) { console.error('Resend error:', err); }
     }
 
-    return { statusCode: 200, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ok: true, status: newStatus }) };
+    return { statusCode: 200, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ok: true, status: newStatus, deposit_payment_link: depositPaymentLink }) };
   }
 
   if (action === 'message') {

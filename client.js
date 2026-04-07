@@ -679,41 +679,51 @@ async function estimateAction(estimateId, action) {
       else { badge.textContent = 'Declined'; badge.className = 'est-status-badge est-status-rejected'; }
     }
 
-    // Remove action buttons from detail
+    // Remove action buttons, replace with deposit button or nothing
     const actions = document.getElementById(`est-actions-${estimateId}`);
-    if (actions) actions.remove();
     const msgForm = document.getElementById(`msg-form-${estimateId}`);
-    if (msgForm) msgForm.remove();
 
-    // If approved with deposit, show pending notice in summary and detail
     if (action === 'approve') {
       const estData = window._estimatesData?.[estimateId];
-      if (estData?.deposit_amount) {
-        // Update summary deposit badge
-        const existingDepBadge = row?.querySelector('.profile-deposit-pending, .profile-deposit-btn');
-        if (!existingDepBadge && row) {
-          const rightDiv = row.querySelector('.profile-row-right');
-          if (rightDiv) {
-            const span = document.createElement('span');
-            span.className = 'profile-deposit-pending';
-            span.textContent = `Deposit $${Number(estData.deposit_amount).toFixed(2)} pending`;
-            rightDiv.appendChild(span);
-          }
-        }
-        // Show pending notice in detail
-        const detail = document.getElementById(`profile-est-detail-${estimateId}`);
-        if (detail && !detail.querySelector('.deposit-pending-note')) {
-          const note = document.createElement('div');
-          note.className = 'deposit-pending-note';
-          note.innerHTML = `<div style="margin:14px 0;padding:14px 16px;background:#eff6ff;border-radius:10px;border:1px solid #bfdbfe;">
-            <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:#1e40af;margin-bottom:4px;">Deposit Required to Start</div>
-            <div style="font-size:24px;font-weight:800;color:#1a56db;">$${Number(estData.deposit_amount).toFixed(2)}</div>
-            <div style="font-size:12px;color:#3730a3;margin-top:4px;">Your contractor will send a secure payment link shortly.</div>
+      const depositLink = data.deposit_payment_link;
+      const depositAmt = estData?.deposit_amount;
+
+      if (actions) {
+        if (depositLink && depositAmt) {
+          // Replace action buttons with Complete Deposit button
+          actions.outerHTML = `<div style="margin:16px 0;" id="est-actions-${estimateId}">
+            <a href="${esc(depositLink)}" class="btn btn-primary btn-block" style="display:block;text-align:center;padding:14px;font-size:16px;font-weight:700;text-decoration:none;" target="_blank">Complete Deposit &rarr; $${Number(depositAmt).toFixed(2)}</a>
+            <p style="font-size:12px;color:#3730a3;text-align:center;margin:8px 0 0;">Secure payment powered by Square</p>
           </div>`;
-          detail.appendChild(note);
+          // Also update summary row
+          const rightDiv = row?.querySelector('.profile-row-right');
+          if (rightDiv) {
+            const existing = rightDiv.querySelector('.profile-deposit-pending, .profile-deposit-btn');
+            if (existing) existing.remove();
+            const a = document.createElement('a');
+            a.href = depositLink;
+            a.target = '_blank';
+            a.className = 'profile-deposit-btn';
+            a.textContent = `Pay $${Number(depositAmt).toFixed(2)} Deposit`;
+            a.onclick = e => e.stopPropagation();
+            rightDiv.appendChild(a);
+          }
+        } else if (depositAmt) {
+          // No Square link yet — show pending message in place of buttons
+          actions.outerHTML = `<div style="margin:14px 0;padding:14px 16px;background:#eff6ff;border-radius:10px;border:1px solid #bfdbfe;" id="est-actions-${estimateId}">
+            <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:#1e40af;margin-bottom:4px;">Deposit Required to Start</div>
+            <div style="font-size:22px;font-weight:800;color:#1a56db;">$${Number(depositAmt).toFixed(2)}</div>
+            <div style="font-size:12px;color:#3730a3;margin-top:4px;">Payment link coming shortly.</div>
+          </div>`;
+        } else {
+          actions.remove();
         }
       }
+    } else {
+      if (actions) actions.remove();
     }
+
+    if (msgForm) msgForm.remove();
   } catch { alert('Something went wrong. Please try again.'); }
 }
 
