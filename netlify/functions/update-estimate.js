@@ -15,7 +15,7 @@ exports.handler = async (event) => {
   let body;
   try { body = JSON.parse(event.body); } catch { return { statusCode: 400, body: JSON.stringify({ error: 'Invalid JSON' }) }; }
 
-  const { estimateId, clientName, clientEmail, clientPhone, clientCompany, clientAddress, clientCity, clientState, clientZip, items, taxRate = 0, notes, receiptPhotos, resendEmail, resendSms, businessProfileId } = body;
+  const { estimateId, clientName, clientEmail, clientPhone, clientCompany, clientAddress, clientCity, clientState, clientZip, items, taxRate = 0, notes, receiptPhotos, resendEmail, resendSms, businessProfileId, depositAmount } = body;
   if (!estimateId || !clientName || !clientEmail || !items?.length) {
     return { statusCode: 400, body: JSON.stringify({ error: 'estimateId, clientName, clientEmail, and items required' }) };
   }
@@ -29,12 +29,8 @@ exports.handler = async (event) => {
   const taxAmount = subtotal * (taxRate / 100);
   const total = subtotal + taxAmount;
 
-  const totalDays = items.reduce((s, i) => s + (Number(i.estimatedDays) || 0), 0);
-  let estimatedCompletionDate = null;
-  if (totalDays > 0) {
-    const d = new Date(); d.setDate(d.getDate() + totalDays);
-    estimatedCompletionDate = d.toISOString().split('T')[0];
-  }
+  const itemDates = items.map(i => i.completionDate).filter(Boolean).sort();
+  const estimatedCompletionDate = itemDates.length ? itemDates[itemDates.length - 1] : null;
 
   const update = {
     client_name: clientName,
@@ -55,6 +51,7 @@ exports.handler = async (event) => {
   };
   if (receiptPhotos !== undefined) update.receipt_photos = receiptPhotos?.length ? receiptPhotos : null;
   if (businessProfileId !== undefined) update.business_profile_id = businessProfileId || null;
+  if (depositAmount !== undefined) update.deposit_amount = depositAmount || null;
 
   const { data: estimate, error: dbError } = await supabase.from('estimates').update(update).eq('id', estimateId).select().single();
   if (dbError) return { statusCode: 502, body: JSON.stringify({ error: dbError.message }) };

@@ -1041,7 +1041,7 @@ const EST_TYPES = [
   { value: 'other', label: 'Other' },
 ];
 
-function addEstimateItem(desc = '', explanation = '', type = 'item', qty = 1, unitPrice = '', discount = '', days = '') {
+function addEstimateItem(desc = '', explanation = '', type = 'item', qty = 1, unitPrice = '', discount = '', completionDate = '') {
   const id = ++estItemId;
   const typeOptions = EST_TYPES.map(t => `<option value="${t.value}"${t.value === type ? ' selected' : ''}>${t.label}</option>`).join('');
   const tr = document.createElement('tr');
@@ -1055,12 +1055,7 @@ function addEstimateItem(desc = '', explanation = '', type = 'item', qty = 1, un
     <td><input type="number" id="est-qty-${id}" value="${escAttr(qty)}" min="0.01" step="any" oninput="recalcEstimateTotals()" style="width:100%;"></td>
     <td><input type="number" id="est-price-${id}" value="${escAttr(unitPrice)}" placeholder="0.00" min="0" step="0.01" oninput="recalcEstimateTotals()" style="width:100%;"></td>
     <td><input type="number" id="est-disc-${id}" value="${escAttr(discount)}" placeholder="0.00" min="0" step="0.01" oninput="recalcEstimateTotals()" style="width:100%;"></td>
-    <td>
-      <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:13px;">
-        <input type="checkbox" id="est-days-toggle-${id}" onchange="toggleEstimateDays(${id},this)"${days ? ' checked' : ''}> Days
-      </label>
-      <input type="number" id="est-days-${id}" value="${escAttr(days)}" placeholder="0" min="1" step="1" oninput="recalcEstimateTotals()" style="width:70px;margin-top:4px;${days ? '' : 'display:none;'}">
-    </td>
+    <td><input type="date" id="est-compdate-${id}" value="${escAttr(completionDate)}" onchange="recalcEstimateTotals()" style="width:100%;"></td>
     <td style="text-align:right;font-weight:500;white-space:nowrap;" id="est-line-total-${id}">$0.00</td>
     <td><button type="button" class="remove-item-btn" onclick="removeEstimateItem(${id})">&#x2715;</button></td>
   `;
@@ -1087,7 +1082,6 @@ function getEstimateItems() {
     const lineTotal = qty * unitPrice;
     const discount = Math.min(parseFloat(document.getElementById(`est-disc-${id}`)?.value) || 0, lineTotal);
     const cost = lineTotal - discount;
-    const daysToggle = document.getElementById(`est-days-toggle-${id}`);
     return {
       type: document.getElementById(`est-type-${id}`)?.value || 'item',
       description: document.getElementById(`est-desc-${id}`)?.value.trim() || '',
@@ -1096,7 +1090,7 @@ function getEstimateItems() {
       unitPrice,
       discount,
       cost,
-      estimatedDays: daysToggle?.checked ? (parseInt(document.getElementById(`est-days-${id}`)?.value) || 0) : 0,
+      completionDate: document.getElementById(`est-compdate-${id}`)?.value || null,
     };
   });
 }
@@ -1114,7 +1108,6 @@ function recalcEstimateTotals() {
   const subtotal = items.reduce((s, i) => s + i.cost, 0);
   const taxAmount = subtotal * (taxRate / 100);
   const total = subtotal + taxAmount;
-  const totalDays = items.reduce((s, i) => s + (i.estimatedDays || 0), 0);
 
   document.getElementById('est-subtotal-display').textContent = `$${subtotal.toFixed(2)}`;
   document.getElementById('est-total-display').textContent = `$${total.toFixed(2)}`;
@@ -1129,9 +1122,10 @@ function recalcEstimateTotals() {
   }
 
   const completionWrap = document.getElementById('est-completion-display');
-  if (totalDays > 0) {
-    const d = new Date(); d.setDate(d.getDate() + totalDays);
-    const dateStr = d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+  const dates = items.map(i => i.completionDate).filter(Boolean).sort();
+  const latestDate = dates.length ? dates[dates.length - 1] : null;
+  if (latestDate) {
+    const dateStr = new Date(latestDate + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
     document.getElementById('est-completion-date').textContent = dateStr;
     completionWrap.style.display = '';
   } else {
@@ -1200,6 +1194,7 @@ async function submitEstimate(e) {
     sendEmail: document.getElementById('est-send-email').checked,
     sendSmsNotification: document.getElementById('est-send-sms').checked,
     receiptPhotos,
+    depositAmount: parseFloat(document.getElementById('est-deposit').value) || null,
   };
 
   if (document.getElementById('est-save-client-check').checked) {
@@ -1359,12 +1354,14 @@ function editEstimate(id) {
   document.getElementById('edit-est-items-tbody').innerHTML = '';
   editEstItemId = 0;
   (est.items || []).forEach(item => {
-    // Backward compat: old items had only `cost`; new ones have quantity + unitPrice
     const qty = item.quantity || 1;
     const unitPrice = item.unitPrice != null ? item.unitPrice : (item.cost || 0);
     const discount = item.discount || 0;
-    addEditEstimateItem(item.description, item.explanation || '', item.type || 'item', qty, unitPrice, discount, item.estimatedDays || '');
+    // Backward compat: old items had estimatedDays, new ones have completionDate
+    const completionDate = item.completionDate || '';
+    addEditEstimateItem(item.description, item.explanation || '', item.type || 'item', qty, unitPrice, discount, completionDate);
   });
+  document.getElementById('edit-est-deposit').value = est.deposit_amount || '';
   recalcEditEstimateTotals();
 
   loadEditPhotos(est.receipt_photos);
@@ -1422,6 +1419,7 @@ async function submitEdit(e) {
         clientZip: document.getElementById('edit-client-zip').value.trim(),
         items, taxRate, notes, resendEmail, resendSms, businessProfileId,
         receiptPhotos: [..._editPhotos, ..._editNewPhotos],
+        depositAmount: parseFloat(document.getElementById('edit-est-deposit').value) || null,
       };
     }
 
@@ -1507,7 +1505,7 @@ function toggleEditTax() {
 }
 
 // Edit tab line items — estimate
-function addEditEstimateItem(desc = '', explanation = '', type = 'item', qty = 1, unitPrice = '', discount = '', days = '') {
+function addEditEstimateItem(desc = '', explanation = '', type = 'item', qty = 1, unitPrice = '', discount = '', completionDate = '') {
   const id = ++editEstItemId;
   const typeOptions = ITEM_TYPES.map(t => `<option value="${t.value}"${t.value === type ? ' selected' : ''}>${t.label}</option>`).join('');
   const tr = document.createElement('tr');
@@ -1521,7 +1519,7 @@ function addEditEstimateItem(desc = '', explanation = '', type = 'item', qty = 1
     <td><input type="number" id="edit-est-qty-${id}" value="${escHtmlJs(qty)}" min="0.01" step="any" oninput="recalcEditEstimateTotals()" style="width:100%;"></td>
     <td><input type="number" id="edit-est-price-${id}" value="${escHtmlJs(unitPrice)}" min="0" step="0.01" oninput="recalcEditEstimateTotals()" placeholder="0.00" style="width:100%;"></td>
     <td><input type="number" id="edit-est-disc-${id}" value="${escHtmlJs(discount)}" min="0" step="0.01" oninput="recalcEditEstimateTotals()" placeholder="0.00" style="width:100%;"></td>
-    <td><input type="number" id="edit-est-days-${id}" value="${escHtmlJs(days)}" min="0" step="1" oninput="recalcEditEstimateTotals()" placeholder="0" style="width:100%;"></td>
+    <td><input type="date" id="edit-est-compdate-${id}" value="${escHtmlJs(completionDate)}" onchange="recalcEditEstimateTotals()" style="width:100%;"></td>
     <td style="text-align:right;font-weight:500;white-space:nowrap;" id="edit-est-line-total-${id}">$0.00</td>
     <td><button type="button" onclick="document.getElementById('edit-est-item-${id}').remove();recalcEditEstimateTotals();" style="background:none;border:none;cursor:pointer;color:var(--gray-400);font-size:18px;">×</button></td>`;
   document.getElementById('edit-est-items-tbody').appendChild(tr);
@@ -1544,7 +1542,7 @@ function getEditEstimateItems() {
       unitPrice,
       discount,
       cost,
-      estimatedDays: parseFloat(document.getElementById(`edit-est-days-${id}`)?.value) || 0,
+      completionDate: document.getElementById(`edit-est-compdate-${id}`)?.value || null,
     };
   }).filter(i => i.description);
 }
@@ -1567,6 +1565,16 @@ function recalcEditEstimateTotals() {
   document.getElementById('edit-est-tax-display').textContent = `$${taxAmt.toFixed(2)}`;
   document.getElementById('edit-est-tax-label').textContent = `Tax (${taxRate}%)`;
   document.getElementById('edit-est-total-display').textContent = `$${(subtotal + taxAmt).toFixed(2)}`;
+
+  const compWrap = document.getElementById('edit-est-completion-display');
+  if (compWrap) {
+    const dates = items.map(i => i.completionDate).filter(Boolean).sort();
+    const latest = dates.length ? dates[dates.length - 1] : null;
+    if (latest) {
+      document.getElementById('edit-est-completion-date').textContent = new Date(latest + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+      compWrap.style.display = '';
+    } else { compWrap.style.display = 'none'; }
+  }
 }
 
 function toggleEditEstimateTax() {

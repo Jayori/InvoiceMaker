@@ -350,6 +350,12 @@ function renderEstimates(estimates) {
           </div>` : ''}
         </div>
 
+        ${est.deposit_amount ? `<div style="margin:14px 0;padding:14px 16px;background:#eff6ff;border-radius:10px;border:1px solid #bfdbfe;">
+          <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:#1e40af;margin-bottom:4px;">Deposit Required to Start</div>
+          <div style="font-size:24px;font-weight:800;color:#1a56db;">$${Number(est.deposit_amount).toFixed(2)}</div>
+          <div style="font-size:12px;color:#3730a3;margin-top:2px;">Due upon approval of this estimate</div>
+        </div>` : ''}
+
         ${est.notes ? `<div class="est-notes">${esc(est.notes)}</div>` : ''}
 
         ${(est.receipt_photos?.length) ? `<div style="margin-bottom:12px;"><div class="est-big-label" style="margin-bottom:6px;">Photos</div><div class="receipt-photos-wrap">${(est.receipt_photos || []).map((p, i) => `<img src="${esc(p)}" class="receipt-thumb" onclick="openPhotoLightbox(window._estPhotosMap['${est.id}'],${i})">`).join('')}</div></div>` : ''}

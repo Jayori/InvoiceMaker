@@ -24,7 +24,7 @@ exports.handler = async (event) => {
   let body;
   try { body = JSON.parse(event.body); } catch { return { statusCode: 400, body: JSON.stringify({ error: 'Invalid JSON' }) }; }
 
-  const { clientName, clientEmail, clientPhone, clientCompany, clientAddress, clientCity, clientState, clientZip, items, taxRate = 0, notes, sendEmail = true, sendSmsNotification, receiptPhotos, businessProfileId } = body;
+  const { clientName, clientEmail, clientPhone, clientCompany, clientAddress, clientCity, clientState, clientZip, items, taxRate = 0, notes, sendEmail = true, sendSmsNotification, receiptPhotos, businessProfileId, depositAmount } = body;
   if (!clientName || !clientEmail || !items?.length) {
     return { statusCode: 400, body: JSON.stringify({ error: 'clientName, clientEmail, and items required' }) };
   }
@@ -33,14 +33,9 @@ exports.handler = async (event) => {
   const taxAmount = subtotal * (taxRate / 100);
   const total = subtotal + taxAmount;
 
-  // Completion date = today + sum of all estimated days
-  const totalDays = items.reduce((s, i) => s + (Number(i.estimatedDays) || 0), 0);
-  let estimatedCompletionDate = null;
-  if (totalDays > 0) {
-    const d = new Date();
-    d.setDate(d.getDate() + totalDays);
-    estimatedCompletionDate = d.toISOString().split('T')[0];
-  }
+  // Completion date = latest end date across all items
+  const itemDates = items.map(i => i.completionDate).filter(Boolean).sort();
+  const estimatedCompletionDate = itemDates.length ? itemDates[itemDates.length - 1] : null;
 
   const estimateNumber = generateEstimateNumber();
 
@@ -82,6 +77,7 @@ exports.handler = async (event) => {
       notes: notes || null,
       receipt_photos: receiptPhotos?.length ? receiptPhotos : null,
       business_profile_id: businessProfileId || null,
+      deposit_amount: depositAmount || null,
     })
     .select().single();
 
