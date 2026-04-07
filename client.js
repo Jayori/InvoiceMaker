@@ -48,7 +48,7 @@ async function loadInvoice(code, justPaid) {
     }
 
     if (data.mode === 'profile') {
-      showProfile(data.client, data.invoices, justPaid, code);
+      showProfile(data.client, data.invoices, data.estimates || [], justPaid, code);
     } else {
       // Legacy fallback: old per-invoice passcode
       showInvoice(data, justPaid);
@@ -65,7 +65,7 @@ async function loadInvoice(code, justPaid) {
 
 let clientPasscode = '';
 
-function showProfile(client, invoices, justPaid, passcode) {
+function showProfile(client, invoices, estimates, justPaid, passcode) {
   clientPasscode = passcode || '';
   document.getElementById('passcode-view').style.display = 'none';
   document.getElementById('invoice-view').style.display = '';
@@ -88,7 +88,7 @@ function showProfile(client, invoices, justPaid, passcode) {
   }
 
   showHistoryFromList(invoices, featured?.id);
-  renderEstimates(client.estimates || []);
+  renderEstimates(estimates);
 }
 
 // ── Invoice detail rendering ──────────────────────────────────────────────────

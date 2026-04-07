@@ -147,21 +147,21 @@ function buildEmail({ invoiceNumber, passcode, clientName, clientAddress, client
   <!-- Passcode box -->
   <tr><td style="padding:28px 40px 0;">
     <table width="100%" cellpadding="0" cellspacing="0" style="background:#eff6ff;border-radius:8px;border:1px solid #bfdbfe;">
-      <tr><td style="padding:20px 24px;">
+      <tr><td style="padding:20px 24px;text-align:center;">
         <p style="margin:0 0 4px;color:#1e40af;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;">Your Access Code</p>
-        <p style="margin:0 0 8px;font-size:32px;font-weight:700;letter-spacing:0.15em;color:#1a56db;font-family:monospace;">${escHtml(passcode)}</p>
-        <p style="margin:0;color:#3730a3;font-size:13px;">Visit <a href="${appUrl}/client.html" style="color:#1a56db;">${appUrl}/client.html</a> and enter this code to view all your invoices. This code stays the same for all future invoices.</p>
+        <p style="margin:0 0 4px;font-size:36px;font-weight:700;letter-spacing:0.2em;color:#1a56db;font-family:monospace;">${escHtml(passcode)}</p>
+        <p style="margin:0;color:#3730a3;font-size:12px;">Use this code on the InvoiceMePro site — same code for all your invoices</p>
       </td></tr>
     </table>
   </td></tr>
 
-  <!-- Pay button -->
-  <tr><td style="padding:28px 40px;" align="center">
-    <a href="${paymentLink}" style="display:inline-block;background:#1a56db;color:#fff;text-decoration:none;padding:14px 40px;border-radius:6px;font-size:16px;font-weight:600;">Pay Now — $${Number(total).toFixed(2)}</a>
+  <!-- View Invoice button -->
+  <tr><td style="padding:24px 40px 0;" align="center">
+    <a href="${appUrl}/client.html" style="display:inline-block;background:#1a56db;color:#fff;text-decoration:none;padding:16px 48px;border-radius:8px;font-size:18px;font-weight:700;letter-spacing:0.01em;font-family:Arial,sans-serif;">View Invoice &rarr;</a>
   </td></tr>
 
-  <tr><td style="padding:0 40px 28px;text-align:center;">
-    <p style="margin:0;color:#9ca3af;font-size:12px;">Secure payment powered by Square</p>
+  <tr><td style="padding:12px 40px 28px;text-align:center;">
+    <p style="margin:0;color:#9ca3af;font-size:12px;">View your invoice and pay securely online</p>
   </td></tr>
 
 </table>

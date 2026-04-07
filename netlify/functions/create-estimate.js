@@ -199,16 +199,20 @@ function buildEstimateEmail({ estimate, passcode, business, appUrl }) {
 
   <tr><td style="padding:28px 40px 0;">
     <table width="100%" cellpadding="0" cellspacing="0" style="background:#f0fdf4;border-radius:8px;border:1px solid #bbf7d0;">
-      <tr><td style="padding:20px 24px;">
+      <tr><td style="padding:20px 24px;text-align:center;">
         <p style="margin:0 0 4px;color:#15803d;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;">Your Access Code</p>
-        <p style="margin:0 0 8px;font-size:32px;font-weight:700;letter-spacing:0.15em;color:#16a34a;font-family:monospace;">${escHtml(passcode)}</p>
-        <p style="margin:0;color:#166534;font-size:13px;">Visit <a href="${appUrl}/client.html" style="color:#16a34a;">${appUrl}/client.html</a> to view, approve, ask questions, or decline this estimate.</p>
+        <p style="margin:0 0 4px;font-size:36px;font-weight:700;letter-spacing:0.2em;color:#16a34a;font-family:monospace;">${escHtml(passcode)}</p>
+        <p style="margin:0 0 0;color:#166534;font-size:12px;">Use this code on the InvoiceMePro site to view your estimate</p>
       </td></tr>
     </table>
   </td></tr>
 
-  <tr><td style="padding:28px 40px;text-align:center;">
-    <p style="margin:0;color:#9ca3af;font-size:12px;">This is an estimate — no payment is due until you approve it.</p>
+  <tr><td style="padding:24px 40px 0;" align="center">
+    <a href="${appUrl}/client.html" style="display:inline-block;background:#0f766e;color:#fff;text-decoration:none;padding:16px 48px;border-radius:8px;font-size:18px;font-weight:700;letter-spacing:0.01em;font-family:Arial,sans-serif;">View Estimate &rarr;</a>
+  </td></tr>
+
+  <tr><td style="padding:16px 40px 28px;text-align:center;">
+    <p style="margin:0;color:#9ca3af;font-size:12px;">View, approve, ask questions, or decline — no payment due until you approve.</p>
   </td></tr>
 
 </table>
