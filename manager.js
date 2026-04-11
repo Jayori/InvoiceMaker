@@ -229,7 +229,8 @@ async function loadInvoices() {
         <td><span class="badge badge-${inv.status}">${capitalize(inv.status)}</span></td>
         <td onclick="event.stopPropagation()" style="white-space:nowrap;">
           <div style="display:flex;gap:6px;flex-wrap:nowrap;align-items:center;">
-            ${inv.square_payment_link ? `<a href="${esc(inv.square_payment_link)}" target="_blank" class="btn btn-sm btn-secondary">Link</a>` : ''}
+            ${inv.square_payment_link ? `<button class="btn btn-sm btn-secondary" onclick="copyPaymentLink('${escAttr(inv.square_payment_link)}')" title="Copy payment link">Copy Link</button>` : ''}
+            ${inv.status !== 'paid' ? `<button class="btn btn-sm" style="background:#dcfce7;color:#166534;border:none;" onclick="markInvoicePaidFromRow('${inv.id}')">Mark Paid</button>` : ''}
             <button class="btn btn-sm btn-secondary" onclick="editInvoice('${inv.id}')">Edit</button>
             <button class="btn btn-sm" style="background:#fee2e2;color:#dc2626;border:none;" onclick="deleteInvoice('${inv.id}')">Delete</button>
             <button class="btn btn-sm btn-secondary" onclick="saveClientFromRow('${escAttr(inv.client_name)}','${escAttr(inv.client_email)}','${escAttr(inv.client_phone||'')}','${escAttr(inv.client_company||'')}','${escAttr(inv.client_address||'')}','${escAttr(inv.client_city||'')}','${escAttr(inv.client_state||'')}','${escAttr(inv.client_zip||'')}')" title="Save client to contacts">+ Client</button>
@@ -742,6 +743,19 @@ function previewInvoice(id) {
         : `<span style="font-size:13px;color:var(--gray-400);">No payment link generated.</span>`);
   footer.innerHTML += `<span class="inv-preview-hint">Client view preview</span>`;
 
+  _currentPreviewId = id;
+  _currentPreviewType = 'invoice';
+
+  // Wire up copy-link and mark-paid buttons in the extra footer row
+  const copyBtn = document.getElementById('copy-link-btn');
+  const markPaidBtn = document.getElementById('mark-paid-btn');
+  if (copyBtn) copyBtn.style.display = inv.square_payment_link ? '' : 'none';
+  if (markPaidBtn) {
+    markPaidBtn.style.display = isPaid ? 'none' : '';
+    markPaidBtn.textContent = 'Mark as Paid';
+    markPaidBtn.disabled = false;
+  }
+
   document.getElementById('inv-preview-modal').classList.add('is-open');
   document.body.style.overflow = 'hidden';
 }
@@ -832,6 +846,19 @@ function previewEstimate(id) {
 
   const footer = document.getElementById('inv-preview-footer');
   footer.innerHTML = `<span style="font-size:13px;color:var(--gray-500);">Passcode: <code style="background:var(--gray-100);padding:2px 6px;border-radius:4px;letter-spacing:0.1em;">${esc(est.passcode || '—')}</code></span><span class="inv-preview-hint">Client view preview</span>`;
+
+  _currentPreviewId = id;
+  _currentPreviewType = 'estimate';
+
+  const copyBtn = document.getElementById('copy-link-btn');
+  const markPaidBtn = document.getElementById('mark-paid-btn');
+  if (copyBtn) copyBtn.style.display = est.deposit_payment_link ? '' : 'none';
+  if (markPaidBtn) {
+    const alreadyPaid = est.deposit_paid;
+    markPaidBtn.style.display = est.deposit_amount ? (alreadyPaid ? 'none' : '') : 'none';
+    markPaidBtn.textContent = 'Mark Deposit Paid';
+    markPaidBtn.disabled = false;
+  }
 
   document.getElementById('inv-preview-modal').classList.add('is-open');
   document.body.style.overflow = 'hidden';
@@ -1021,6 +1048,21 @@ function showConvertToInvoice(estimate) {
       <div style="font-size:14px;font-weight:700;color:var(--gray-800);white-space:nowrap;">$${Number(item.cost || 0).toFixed(2)}</div>
     </label>`).join('');
 
+  // Show deposit deduction option if deposit exists
+  const depositRow = document.getElementById('convert-deposit-row');
+  const depositLabel = document.getElementById('convert-deposit-label');
+  const deductCb = document.getElementById('convert-deduct-deposit');
+  if (depositRow && estimate.deposit_amount && Number(estimate.deposit_amount) > 0) {
+    const dep = Number(estimate.deposit_amount);
+    const isPaid = estimate.deposit_paid;
+    depositLabel.textContent = `Deduct deposit ${isPaid ? 'paid' : 'owed'}: $${dep.toFixed(2)}`;
+    deductCb.checked = !!isPaid; // auto-check if already paid
+    depositRow.style.display = '';
+  } else if (depositRow) {
+    depositRow.style.display = 'none';
+    if (deductCb) deductCb.checked = false;
+  }
+
   recalcConvertTotal();
 }
 
@@ -1039,6 +1081,10 @@ function recalcConvertTotal() {
   document.querySelectorAll('.convert-item-check:checked').forEach(cb => {
     total += parseFloat(cb.dataset.cost) || 0;
   });
+  const deductCb = document.getElementById('convert-deduct-deposit');
+  if (deductCb?.checked && currentEstimateData?.deposit_amount) {
+    total = Math.max(0, total - Number(currentEstimateData.deposit_amount));
+  }
   const totalEl = document.getElementById('convert-total');
   if (totalEl) totalEl.textContent = `$${total.toFixed(2)}`;
 }
@@ -1060,6 +1106,20 @@ async function submitConvertToInvoice() {
     quantity: 1,
     unitPrice: Number(allItems[i].cost) || 0,
   }));
+
+  // Optionally deduct deposit as a credit line
+  const deductCb = document.getElementById('convert-deduct-deposit');
+  if (deductCb?.checked && currentEstimateData?.deposit_amount) {
+    const dep = Number(currentEstimateData.deposit_amount);
+    if (dep > 0) {
+      invoiceItems.push({
+        type: 'other',
+        description: `Deposit credit (${currentEstimateData.estimate_number})`,
+        quantity: 1,
+        unitPrice: -dep,
+      });
+    }
+  }
 
   const payload = {
     clientName: currentEstimateData.client_name,
@@ -1877,4 +1937,123 @@ async function createDeposit() {
   } finally {
     btn.disabled = false; btn.textContent = 'Send Deposit Request';
   }
+}
+
+// ─── Copy payment link ─────────────────────────────────────────────────────────
+
+let _currentPreviewId = null;
+let _currentPreviewType = 'invoice'; // 'invoice' or 'estimate'
+
+function copyPaymentLink(url) {
+  if (!url) { showToast('No payment link available.', 'error'); return; }
+  navigator.clipboard.writeText(url).then(() => {
+    showToast('Payment link copied!', 'success');
+  }).catch(() => {
+    // Fallback for older browsers
+    const ta = document.createElement('textarea');
+    ta.value = url;
+    ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    showToast('Payment link copied!', 'success');
+  });
+}
+
+function copyPreviewLink() {
+  const inv = _currentPreviewType === 'invoice'
+    ? invoicesCache.find(i => i.id === _currentPreviewId)
+    : estimatesCache.find(e => e.id === _currentPreviewId);
+  const url = inv?.square_payment_link || inv?.deposit_payment_link;
+  copyPaymentLink(url);
+}
+
+// ─── Mark as paid ──────────────────────────────────────────────────────────────
+
+async function markCurrentPaid() {
+  if (!_currentPreviewId) return;
+  const label = _currentPreviewType === 'invoice' ? 'invoice' : 'estimate deposit';
+  if (!confirm(`Mark this ${label} as paid? This cannot be undone.`)) return;
+
+  const btn = document.getElementById('mark-paid-btn');
+  btn.disabled = true; btn.textContent = 'Saving...';
+
+  try {
+    const res = await fetch('/api/mark-paid', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: _currentPreviewId, type: _currentPreviewType }),
+    });
+    if (!res.ok) throw new Error('Failed to mark paid');
+    showToast('Marked as paid!', 'success');
+    closePreviewModal();
+    loadInvoices();
+    loadEstimates();
+  } catch (err) {
+    showToast(err.message, 'error');
+    btn.disabled = false; btn.textContent = 'Mark as Paid';
+  }
+}
+
+async function markInvoicePaidFromRow(id) {
+  const inv = invoicesCache.find(i => i.id === id);
+  if (!confirm(`Mark ${inv?.invoice_number || 'invoice'} as paid?`)) return;
+  try {
+    const res = await fetch('/api/mark-paid', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, type: 'invoice' }),
+    });
+    if (!res.ok) throw new Error('Failed');
+    showToast('Invoice marked as paid!', 'success');
+    loadInvoices();
+  } catch { showToast('Failed to mark paid.', 'error'); }
+}
+
+// ─── Print / Save PDF ──────────────────────────────────────────────────────────
+
+function printReceipt() {
+  const bodyEl = document.getElementById('inv-preview-body');
+  if (!bodyEl || !bodyEl.innerHTML.trim()) {
+    showToast('Nothing to print.', 'error'); return;
+  }
+  const inv = _currentPreviewType === 'invoice'
+    ? invoicesCache.find(i => i.id === _currentPreviewId)
+    : estimatesCache.find(e => e.id === _currentPreviewId);
+  const isPaid = inv?.status === 'paid';
+
+  const win = window.open('', '_blank');
+  win.document.write(`<!DOCTYPE html><html><head>
+  <meta charset="UTF-8">
+  <title>Invoice Print</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 0; padding: 24px; color: #111; font-size: 14px; }
+    table { border-collapse: collapse; width: 100%; }
+    th, td { padding: 8px 10px; }
+    thead th { border-bottom: 2px solid #e5e7eb; font-size: 11px; text-transform: uppercase; color: #6b7280; }
+    .inv-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; }
+    .inv-number { font-size: 15px; font-weight: 700; color: #374151; }
+    .inv-total-big { font-size: 30px; font-weight: 800; color: #1a56db; }
+    .inv-meta { display: flex; gap: 32px; margin-bottom: 16px; font-size: 13px; }
+    .inv-label { font-size: 11px; text-transform: uppercase; color: #9ca3af; display: block; margin-bottom: 2px; }
+    .inv-val { font-weight: 600; color: #111827; }
+    .inv-totals { margin-top: 12px; text-align: right; }
+    .inv-totals-row { display: flex; justify-content: flex-end; gap: 40px; padding: 4px 0; font-size: 14px; }
+    .inv-totals-total { font-weight: 800; font-size: 16px; border-top: 2px solid #e5e7eb; padding-top: 8px; }
+    .inv-preview-bizname { font-size: 22px; font-weight: 800; color: #111827; margin-bottom: 18px; }
+    .inv-notes-text { font-size: 13px; color: #374151; margin-top: 4px; white-space: pre-wrap; }
+    .inv-status-badge { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 12px; font-weight: 600; }
+    .inv-status-paid { background: #ecfdf5; color: #059669; }
+    .inv-status-pending { background: #fff7ed; color: #c2410c; }
+    .work-date-header { font-size: 11px; font-weight: 700; text-transform: uppercase; color: #6b7280; background: #f9fafb; padding: 6px 10px; }
+    .item-type-tag { font-size: 10px; color: #9ca3af; }
+    .unpaid-stamp { text-align: center; margin: 20px 0; padding: 12px; border: 3px solid #dc2626; border-radius: 8px; color: #dc2626; font-size: 20px; font-weight: 900; letter-spacing: 0.15em; }
+    @media print { body { padding: 12px; } }
+  </style>
+  </head><body>
+  ${!isPaid ? `<div class="unpaid-stamp">UNPAID</div>` : ''}
+  ${bodyEl.innerHTML}
+  <script>window.onload = function(){ window.print(); }<\/script>
+  </body></html>`);
+  win.document.close();
 }

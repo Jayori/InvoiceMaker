@@ -183,7 +183,8 @@ exports.handler = async (event) => {
 
   const subtotal = items.reduce((s, i) => {
     const lineTotal = i.quantity * i.unitPrice;
-    const disc = Math.min(Number(i.discount) || 0, lineTotal);
+    // Only cap discount on positive items (negative items = credits)
+    const disc = lineTotal > 0 ? Math.min(Number(i.discount) || 0, lineTotal) : 0;
     return s + lineTotal - disc;
   }, 0);
   const taxAmount = subtotal * (taxRate / 100);
@@ -218,19 +219,31 @@ exports.handler = async (event) => {
     if (data) business = data;
   }
 
-  // Create Square payment link
+  // Create Square payment link (skip if fully covered by deposit)
   let squarePaymentLink = null, squareOrderId = null;
+  const netTotal = total;
+  if (netTotal <= 0) {
+    // Fully covered — save as paid immediately, no Square link needed
+    const { data: invoice, error: dbError } = await supabase
+      .from('invoices')
+      .insert({ invoice_number: invoiceNumber, passcode, client_name: clientName, client_email: clientEmail, client_phone: clientPhone || null, client_company: clientCompany || null, client_address: clientAddress || null, client_city: clientCity || null, client_state: clientState || null, client_zip: clientZip || null, items, subtotal, tax_rate: taxRate, tax_amount: taxAmount, total: 0, notes: notes || null, due_date: dueDate || null, square_payment_link: null, square_order_id: null, receipt_photos: receiptPhotos?.length ? receiptPhotos : null, business_profile_id: businessProfileId || null, status: 'paid', paid_at: new Date().toISOString() })
+      .select().single();
+    if (dbError) return { statusCode: 502, body: JSON.stringify({ error: 'Failed to save invoice', detail: dbError.message }) };
+    return { statusCode: 200, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(invoice) };
+  }
   try {
     const lineItems = items.map(item => {
       const lineTotal = item.quantity * item.unitPrice;
-      const disc = Math.min(Number(item.discount) || 0, lineTotal);
+      const disc = lineTotal > 0 ? Math.min(Number(item.discount) || 0, lineTotal) : 0;
       const netTotal = lineTotal - disc;
+      // Skip zero or negative items (deposit credits) from Square — they're in the invoice record only
+      if (netTotal <= 0) return null;
       // If discounted, collapse to qty=1 at net price; otherwise keep original qty+rate
       if (disc > 0) {
         return { name: item.description.substring(0, 100), quantity: '1', basePriceMoney: { amount: BigInt(Math.round(netTotal * 100)), currency: 'USD' } };
       }
       return { name: item.description.substring(0, 100), quantity: String(item.quantity), basePriceMoney: { amount: BigInt(Math.round(item.unitPrice * 100)), currency: 'USD' } };
-    });
+    }).filter(Boolean);
     if (taxRate > 0) {
       lineItems.push({ name: `Tax (${taxRate}%)`, quantity: '1', basePriceMoney: { amount: BigInt(Math.round(taxAmount * 100)), currency: 'USD' } });
     }

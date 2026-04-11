@@ -40,9 +40,14 @@ exports.handler = async (event) => {
     return { statusCode: 400, body: 'Invalid JSON' };
   }
 
-  // Handle payment completed events
-  if (payload.type === 'payment.completed') {
-    const payment = payload.data?.object?.payment;
+  // Handle payment completed events.
+  // Square sends 'payment.updated' (status='COMPLETED') not 'payment.completed'.
+  const payment = payload.data?.object?.payment;
+  const isCompleted =
+    (payload.type === 'payment.updated' || payload.type === 'payment.completed') &&
+    payment?.status === 'COMPLETED';
+
+  if (isCompleted) {
     if (!payment) {
       return { statusCode: 200, body: 'OK' };
     }

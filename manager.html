@@ -170,6 +170,12 @@
                     <span style="font-size:14px;font-weight:600;">Invoice Total</span>
                     <span style="font-size:18px;font-weight:800;color:#0f766e;" id="convert-total">$0.00</span>
                   </div>
+                  <div id="convert-deposit-row" style="display:none;margin-bottom:12px;padding:10px 12px;background:#f0fdf4;border-radius:8px;border:1px solid #bbf7d0;">
+                    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px;color:#166534;">
+                      <input type="checkbox" id="convert-deduct-deposit" onchange="recalcConvertTotal()">
+                      <span id="convert-deposit-label">Deduct deposit already paid</span>
+                    </label>
+                  </div>
                   <div style="display:flex;gap:8px;flex-wrap:wrap;">
                     <button class="btn btn-primary" onclick="submitConvertToInvoice()" id="convert-send-btn">Send Invoice</button>
                     <button class="btn btn-secondary btn-sm" onclick="selectAllConvertItems(true)">Select All</button>
@@ -584,7 +590,6 @@
                 <div id="est-deposit-auto-label" style="display:none;font-size:12px;color:#3b82f6;margin-top:6px;">Auto-calculated from item deposit percentages</div>
               </div>
             </div>
-            </div>
 
             <div class="card">
               <div class="card-title">Notes (optional)</div>
@@ -930,6 +935,11 @@
       </div>
       <div class="inv-preview-footer" id="inv-preview-footer">
         <!-- populated by previewInvoice() -->
+      </div>
+      <div class="inv-preview-footer" style="border-top:none;padding-top:0;gap:8px;">
+        <button class="btn btn-sm btn-secondary" onclick="copyPreviewLink()" id="copy-link-btn" style="display:none;">Copy Payment Link</button>
+        <button class="btn btn-sm btn-secondary" onclick="printReceipt()">Print / Save PDF</button>
+        <button class="btn btn-sm" style="background:#dcfce7;color:#166534;border:none;" onclick="markCurrentPaid()" id="mark-paid-btn" style="display:none;">Mark as Paid</button>
       </div>
     </div>
   </div>
