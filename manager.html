@@ -13,8 +13,8 @@
     <div class="pin-card">
       <div class="pin-logo" id="pin-biz-name">Invoice Pro</div>
       <h2 class="pin-heading">Manager Access</h2>
-      <form onsubmit="verifyPin(event)">
-        <input type="password" id="pin-input" class="pin-input" placeholder="Enter PIN" maxlength="20" required autofocus>
+      <form onsubmit="verifyPin(event)" autocomplete="off">
+        <input type="password" id="pin-input" class="pin-input" placeholder="Enter PIN" maxlength="20" required autofocus autocomplete="off">
         <button type="submit" class="btn btn-primary btn-block" id="pin-btn">Enter</button>
       </form>
       <div id="pin-error" class="client-error" style="display:none;">Incorrect PIN. Try again.</div>

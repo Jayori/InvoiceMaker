@@ -15,7 +15,7 @@
       <h2 class="client-heading">Enter Your Access Code</h2>
       <p class="client-sub">Your 6-character code was emailed to you when your first invoice or estimate was sent.</p>
 
-      <form onsubmit="lookupInvoice(event)">
+      <form onsubmit="lookupInvoice(event)" autocomplete="off">
         <input type="text" id="passcode-input" class="passcode-input"
           placeholder="e.g. A3K9X2"
           maxlength="6"
