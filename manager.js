@@ -403,13 +403,10 @@ async function submitInvoice(e) {
     const data = await res.json();
     if (!res.ok) throw new Error(`${data.error || 'Failed'}${data.detail ? ': ' + data.detail : ''}`);
 
-    const successEl = document.getElementById('invoice-success');
-    document.getElementById('success-detail').textContent =
-      `${data.invoice_number} sent to ${payload.clientEmail}. Client passcode: ${data.passcode}`;
-    successEl.style.display = '';
     resetInvoiceForm();
     loadInvoices();
-    setTimeout(() => { successEl.style.display = 'none'; }, 8000);
+    showTab('dashboard');
+    showToast('Invoice Sent!', 'success');
   } catch (err) {
     showToast(err.message, 'error');
   } finally {
@@ -1381,13 +1378,10 @@ async function submitEstimate(e) {
     const data = await res.json();
     if (!res.ok) throw new Error(`${data.error || 'Failed'}${data.detail ? ': ' + data.detail : ''}`);
 
-    const successEl = document.getElementById('est-success');
-    document.getElementById('est-success-detail').textContent =
-      `${data.estimate_number} sent to ${payload.clientEmail}. Client access code: ${data.passcode}`;
-    successEl.style.display = '';
     resetEstimateForm();
     loadEstimates();
-    setTimeout(() => { successEl.style.display = 'none'; }, 8000);
+    showTab('dashboard');
+    showToast('Estimate Sent!', 'success');
   } catch (err) {
     showToast(err.message, 'error');
   } finally {
