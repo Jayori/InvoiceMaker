@@ -92,6 +92,7 @@
                 <option value="pending">Pending</option>
                 <option value="paid">Paid</option>
               </select>
+              <button class="btn btn-sm btn-secondary" onclick="syncSquarePayments()" id="sync-btn" title="Check Square for payments and update any pending invoices/deposits">Sync from Square</button>
             </div>
           </div>
 
@@ -314,6 +315,11 @@
               </div>
               <div class="add-item-row">
                 <button type="button" class="btn btn-secondary btn-sm" onclick="addItem()">+ Add Line Item</button>
+                <span style="font-size:12px;color:var(--gray-400);margin-left:8px;margin-right:4px;">Quick:</span>
+                <button type="button" class="btn btn-sm" style="background:#f0fdf4;color:#166534;border:1px solid #bbf7d0;" onclick="quickServiceCall(95)">Service $95</button>
+                <button type="button" class="btn btn-sm" style="background:#f0fdf4;color:#166534;border:1px solid #bbf7d0;" onclick="quickServiceCall(105)">$105</button>
+                <button type="button" class="btn btn-sm" style="background:#f0fdf4;color:#166534;border:1px solid #bbf7d0;" onclick="quickServiceCall(115)">$115</button>
+                <button type="button" class="btn btn-sm" style="background:#f0fdf4;color:#166534;border:1px solid #bbf7d0;" onclick="quickServiceCall(135)">$135</button>
               </div>
 
               <!-- Tax -->
@@ -554,6 +560,11 @@
               </div>
               <div class="add-item-row">
                 <button type="button" class="btn btn-secondary btn-sm" onclick="addEstimateItem()">+ Add Item</button>
+                <span style="font-size:12px;color:var(--gray-400);margin-left:8px;margin-right:4px;">Quick:</span>
+                <button type="button" class="btn btn-sm" style="background:#f0fdf4;color:#166534;border:1px solid #bbf7d0;" onclick="quickEstServiceCall(95)">Service $95</button>
+                <button type="button" class="btn btn-sm" style="background:#f0fdf4;color:#166534;border:1px solid #bbf7d0;" onclick="quickEstServiceCall(105)">$105</button>
+                <button type="button" class="btn btn-sm" style="background:#f0fdf4;color:#166534;border:1px solid #bbf7d0;" onclick="quickEstServiceCall(115)">$115</button>
+                <button type="button" class="btn btn-sm" style="background:#f0fdf4;color:#166534;border:1px solid #bbf7d0;" onclick="quickEstServiceCall(135)">$135</button>
               </div>
 
               <!-- Tax -->
@@ -787,6 +798,11 @@
                 </div>
                 <div class="add-item-row">
                   <button type="button" class="btn btn-secondary btn-sm" onclick="addEditItem()">+ Add Line Item</button>
+                  <span style="font-size:12px;color:var(--gray-400);margin-left:8px;margin-right:4px;">Quick:</span>
+                  <button type="button" class="btn btn-sm" style="background:#f0fdf4;color:#166534;border:1px solid #bbf7d0;" onclick="quickServiceCall(95,'edit')">Service $95</button>
+                  <button type="button" class="btn btn-sm" style="background:#f0fdf4;color:#166534;border:1px solid #bbf7d0;" onclick="quickServiceCall(105,'edit')">$105</button>
+                  <button type="button" class="btn btn-sm" style="background:#f0fdf4;color:#166534;border:1px solid #bbf7d0;" onclick="quickServiceCall(115,'edit')">$115</button>
+                  <button type="button" class="btn btn-sm" style="background:#f0fdf4;color:#166534;border:1px solid #bbf7d0;" onclick="quickServiceCall(135,'edit')">$135</button>
                 </div>
                 <div style="margin-top:16px;display:flex;align-items:center;gap:12px;">
                   <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px;">
@@ -829,6 +845,11 @@
                 </div>
                 <div class="add-item-row">
                   <button type="button" class="btn btn-secondary btn-sm" onclick="addEditEstimateItem()">+ Add Item</button>
+                  <span style="font-size:12px;color:var(--gray-400);margin-left:8px;margin-right:4px;">Quick:</span>
+                  <button type="button" class="btn btn-sm" style="background:#f0fdf4;color:#166534;border:1px solid #bbf7d0;" onclick="quickEstServiceCall(95,'edit')">Service $95</button>
+                  <button type="button" class="btn btn-sm" style="background:#f0fdf4;color:#166534;border:1px solid #bbf7d0;" onclick="quickEstServiceCall(105,'edit')">$105</button>
+                  <button type="button" class="btn btn-sm" style="background:#f0fdf4;color:#166534;border:1px solid #bbf7d0;" onclick="quickEstServiceCall(115,'edit')">$115</button>
+                  <button type="button" class="btn btn-sm" style="background:#f0fdf4;color:#166534;border:1px solid #bbf7d0;" onclick="quickEstServiceCall(135,'edit')">$135</button>
                 </div>
                 <div style="margin-top:16px;display:flex;align-items:center;gap:12px;">
                   <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px;">

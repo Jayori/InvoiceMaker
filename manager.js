@@ -1939,6 +1939,46 @@ async function createDeposit() {
   }
 }
 
+// ─── Sync from Square ─────────────────────────────────────────────────────────
+
+async function syncSquarePayments() {
+  const btn = document.getElementById('sync-btn');
+  btn.disabled = true; btn.textContent = 'Syncing...';
+  try {
+    const res = await fetch('/api/sync-square-payments', { method: 'POST' });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Sync failed');
+    const msg = `Sync complete — ${data.invoicesUpdated} invoice(s) and ${data.depositsUpdated} deposit(s) updated.`;
+    showToast(msg, 'success');
+    loadInvoices();
+    loadEstimates();
+  } catch (err) {
+    showToast(err.message, 'error');
+  } finally {
+    btn.disabled = false; btn.textContent = 'Sync from Square';
+  }
+}
+
+// ─── Quick service call presets ────────────────────────────────────────────────
+
+const SERVICE_CALL_LABEL = 'Service Call';
+
+function quickServiceCall(price, mode = 'new') {
+  if (mode === 'edit') {
+    addEditItem(SERVICE_CALL_LABEL, 'service', 1, price);
+  } else {
+    addItem(SERVICE_CALL_LABEL, 'service', 1, price);
+  }
+}
+
+function quickEstServiceCall(price, mode = 'new') {
+  if (mode === 'edit') {
+    addEditEstimateItem(SERVICE_CALL_LABEL, '', 'service', 1, price);
+  } else {
+    addEstimateItem(SERVICE_CALL_LABEL, '', 'service', 1, price);
+  }
+}
+
 // ─── Copy payment link ─────────────────────────────────────────────────────────
 
 let _currentPreviewId = null;
