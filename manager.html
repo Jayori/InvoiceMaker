@@ -315,8 +315,8 @@
               </div>
               <div class="add-item-row">
                 <button type="button" class="btn btn-secondary btn-sm" onclick="addItem()">+ Add Line Item</button>
-                <span style="font-size:12px;color:var(--gray-400);margin-left:8px;margin-right:4px;">Quick:</span>
-                <button type="button" class="btn btn-sm" style="background:#f0fdf4;color:#166534;border:1px solid #bbf7d0;" onclick="quickServiceCall(95)">Service $95</button>
+                <span style="font-size:12px;color:var(--gray-400);margin-left:8px;margin-right:4px;">Service Call:</span>
+                <button type="button" class="btn btn-sm" style="background:#f0fdf4;color:#166534;border:1px solid #bbf7d0;" onclick="quickServiceCall(95)">$95</button>
                 <button type="button" class="btn btn-sm" style="background:#f0fdf4;color:#166534;border:1px solid #bbf7d0;" onclick="quickServiceCall(105)">$105</button>
                 <button type="button" class="btn btn-sm" style="background:#f0fdf4;color:#166534;border:1px solid #bbf7d0;" onclick="quickServiceCall(115)">$115</button>
                 <button type="button" class="btn btn-sm" style="background:#f0fdf4;color:#166534;border:1px solid #bbf7d0;" onclick="quickServiceCall(135)">$135</button>
@@ -560,8 +560,8 @@
               </div>
               <div class="add-item-row">
                 <button type="button" class="btn btn-secondary btn-sm" onclick="addEstimateItem()">+ Add Item</button>
-                <span style="font-size:12px;color:var(--gray-400);margin-left:8px;margin-right:4px;">Quick:</span>
-                <button type="button" class="btn btn-sm" style="background:#f0fdf4;color:#166534;border:1px solid #bbf7d0;" onclick="quickEstServiceCall(95)">Service $95</button>
+                <span style="font-size:12px;color:var(--gray-400);margin-left:8px;margin-right:4px;">Service Call:</span>
+                <button type="button" class="btn btn-sm" style="background:#f0fdf4;color:#166534;border:1px solid #bbf7d0;" onclick="quickEstServiceCall(95)">$95</button>
                 <button type="button" class="btn btn-sm" style="background:#f0fdf4;color:#166534;border:1px solid #bbf7d0;" onclick="quickEstServiceCall(105)">$105</button>
                 <button type="button" class="btn btn-sm" style="background:#f0fdf4;color:#166534;border:1px solid #bbf7d0;" onclick="quickEstServiceCall(115)">$115</button>
                 <button type="button" class="btn btn-sm" style="background:#f0fdf4;color:#166534;border:1px solid #bbf7d0;" onclick="quickEstServiceCall(135)">$135</button>
@@ -798,8 +798,8 @@
                 </div>
                 <div class="add-item-row">
                   <button type="button" class="btn btn-secondary btn-sm" onclick="addEditItem()">+ Add Line Item</button>
-                  <span style="font-size:12px;color:var(--gray-400);margin-left:8px;margin-right:4px;">Quick:</span>
-                  <button type="button" class="btn btn-sm" style="background:#f0fdf4;color:#166534;border:1px solid #bbf7d0;" onclick="quickServiceCall(95,'edit')">Service $95</button>
+                  <span style="font-size:12px;color:var(--gray-400);margin-left:8px;margin-right:4px;">Service Call:</span>
+                  <button type="button" class="btn btn-sm" style="background:#f0fdf4;color:#166534;border:1px solid #bbf7d0;" onclick="quickServiceCall(95,'edit')">$95</button>
                   <button type="button" class="btn btn-sm" style="background:#f0fdf4;color:#166534;border:1px solid #bbf7d0;" onclick="quickServiceCall(105,'edit')">$105</button>
                   <button type="button" class="btn btn-sm" style="background:#f0fdf4;color:#166534;border:1px solid #bbf7d0;" onclick="quickServiceCall(115,'edit')">$115</button>
                   <button type="button" class="btn btn-sm" style="background:#f0fdf4;color:#166534;border:1px solid #bbf7d0;" onclick="quickServiceCall(135,'edit')">$135</button>
@@ -845,8 +845,8 @@
                 </div>
                 <div class="add-item-row">
                   <button type="button" class="btn btn-secondary btn-sm" onclick="addEditEstimateItem()">+ Add Item</button>
-                  <span style="font-size:12px;color:var(--gray-400);margin-left:8px;margin-right:4px;">Quick:</span>
-                  <button type="button" class="btn btn-sm" style="background:#f0fdf4;color:#166534;border:1px solid #bbf7d0;" onclick="quickEstServiceCall(95,'edit')">Service $95</button>
+                  <span style="font-size:12px;color:var(--gray-400);margin-left:8px;margin-right:4px;">Service Call:</span>
+                  <button type="button" class="btn btn-sm" style="background:#f0fdf4;color:#166534;border:1px solid #bbf7d0;" onclick="quickEstServiceCall(95,'edit')">$95</button>
                   <button type="button" class="btn btn-sm" style="background:#f0fdf4;color:#166534;border:1px solid #bbf7d0;" onclick="quickEstServiceCall(105,'edit')">$105</button>
                   <button type="button" class="btn btn-sm" style="background:#f0fdf4;color:#166534;border:1px solid #bbf7d0;" onclick="quickEstServiceCall(115,'edit')">$115</button>
                   <button type="button" class="btn btn-sm" style="background:#f0fdf4;color:#166534;border:1px solid #bbf7d0;" onclick="quickEstServiceCall(135,'edit')">$135</button>
@@ -961,6 +961,7 @@
         <button class="btn btn-sm btn-secondary" onclick="copyPreviewLink()" id="copy-link-btn" style="display:none;">Copy Payment Link</button>
         <button class="btn btn-sm btn-secondary" onclick="printReceipt()">Print / Save PDF</button>
         <button class="btn btn-sm" style="background:#dcfce7;color:#166534;border:none;" onclick="markCurrentPaid()" id="mark-paid-btn" style="display:none;">Mark as Paid</button>
+        <button class="btn btn-sm" style="background:#fef3c7;color:#92400e;border:none;display:none;" id="undo-paid-btn" onclick="undoMarkPaid()">Undo Paid</button>
       </div>
     </div>
   </div>

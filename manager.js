@@ -48,8 +48,6 @@ function initManager() {
   loadInvoices();
   loadEstimates();
   loadClients();
-  addItem();
-  addEstimateItem();
 }
 
 // Check session on load
@@ -229,7 +227,7 @@ async function loadInvoices() {
         <td><span class="badge badge-${inv.status}">${capitalize(inv.status)}</span></td>
         <td onclick="event.stopPropagation()" style="white-space:nowrap;">
           <div style="display:flex;gap:6px;flex-wrap:nowrap;align-items:center;">
-            ${inv.square_payment_link ? `<button class="btn btn-sm btn-secondary" onclick="copyPaymentLink('${escAttr(inv.square_payment_link)}')" title="Copy payment link">Copy Link</button>` : ''}
+            ${inv.square_payment_link && inv.status !== 'paid' ? `<button class="btn btn-sm btn-secondary" onclick="copyPaymentLink('${escAttr(inv.square_payment_link)}')" title="Copy payment link">Copy Link</button>` : ''}
             ${inv.status !== 'paid' ? `<button class="btn btn-sm" style="background:#dcfce7;color:#166534;border:none;" onclick="markInvoicePaidFromRow('${inv.id}')">Mark Paid</button>` : ''}
             <button class="btn btn-sm btn-secondary" onclick="editInvoice('${inv.id}')">Edit</button>
             <button class="btn btn-sm" style="background:#fee2e2;color:#dc2626;border:none;" onclick="deleteInvoice('${inv.id}')">Delete</button>
@@ -433,7 +431,6 @@ function resetInvoiceForm() {
     if (el) el.value = '';
   });
   recalcTotals();
-  addItem();
 }
 
 // ─── Clients ───────────────────────────────────────────────────────────────────
@@ -746,14 +743,20 @@ function previewInvoice(id) {
   _currentPreviewId = id;
   _currentPreviewType = 'invoice';
 
-  // Wire up copy-link and mark-paid buttons in the extra footer row
+  // Wire up copy-link, mark-paid, and undo-paid buttons in the extra footer row
   const copyBtn = document.getElementById('copy-link-btn');
   const markPaidBtn = document.getElementById('mark-paid-btn');
-  if (copyBtn) copyBtn.style.display = inv.square_payment_link ? '' : 'none';
+  const undoPaidBtn = document.getElementById('undo-paid-btn');
+  if (copyBtn) copyBtn.style.display = (inv.square_payment_link && !isPaid) ? '' : 'none';
   if (markPaidBtn) {
     markPaidBtn.style.display = isPaid ? 'none' : '';
     markPaidBtn.textContent = 'Mark as Paid';
     markPaidBtn.disabled = false;
+  }
+  if (undoPaidBtn) {
+    undoPaidBtn.style.display = isPaid ? '' : 'none';
+    undoPaidBtn.textContent = 'Undo Paid';
+    undoPaidBtn.disabled = false;
   }
 
   document.getElementById('inv-preview-modal').classList.add('is-open');
@@ -852,13 +855,15 @@ function previewEstimate(id) {
 
   const copyBtn = document.getElementById('copy-link-btn');
   const markPaidBtn = document.getElementById('mark-paid-btn');
-  if (copyBtn) copyBtn.style.display = est.deposit_payment_link ? '' : 'none';
+  const undoPaidBtn2 = document.getElementById('undo-paid-btn');
+  const alreadyPaid = est.deposit_paid;
+  if (copyBtn) copyBtn.style.display = (est.deposit_payment_link && !alreadyPaid) ? '' : 'none';
   if (markPaidBtn) {
-    const alreadyPaid = est.deposit_paid;
     markPaidBtn.style.display = est.deposit_amount ? (alreadyPaid ? 'none' : '') : 'none';
     markPaidBtn.textContent = 'Mark Deposit Paid';
     markPaidBtn.disabled = false;
   }
+  if (undoPaidBtn2) undoPaidBtn2.style.display = 'none'; // undo not supported for estimates
 
   document.getElementById('inv-preview-modal').classList.add('is-open');
   document.body.style.overflow = 'hidden';
@@ -1404,7 +1409,6 @@ function resetEstimateForm() {
     const el = document.getElementById(id); if (el) el.value = '';
   });
   recalcEstimateTotals();
-  addEstimateItem();
 }
 
 // Populate estimate client dropdown from existing clientsCache
@@ -2013,7 +2017,7 @@ function copyPreviewLink() {
 async function markCurrentPaid() {
   if (!_currentPreviewId) return;
   const label = _currentPreviewType === 'invoice' ? 'invoice' : 'estimate deposit';
-  if (!confirm(`Mark this ${label} as paid? This cannot be undone.`)) return;
+  if (!confirm(`Mark this ${label} as paid?`)) return;
 
   const btn = document.getElementById('mark-paid-btn');
   btn.disabled = true; btn.textContent = 'Saving...';
@@ -2032,6 +2036,30 @@ async function markCurrentPaid() {
   } catch (err) {
     showToast(err.message, 'error');
     btn.disabled = false; btn.textContent = 'Mark as Paid';
+  }
+}
+
+async function undoMarkPaid() {
+  if (!_currentPreviewId) return;
+  if (!confirm('Undo paid status? This will create a new Square payment link and reset the invoice to pending.')) return;
+
+  const btn = document.getElementById('undo-paid-btn');
+  btn.disabled = true; btn.textContent = 'Working...';
+
+  try {
+    const res = await fetch('/api/recreate-payment-link', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ invoiceId: _currentPreviewId }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed to recreate payment link');
+    showToast('Invoice reset to pending with new payment link!', 'success');
+    closePreviewModal();
+    loadInvoices();
+  } catch (err) {
+    showToast(err.message, 'error');
+    btn.disabled = false; btn.textContent = 'Undo Paid';
   }
 }
 
