@@ -2147,18 +2147,31 @@ function _destroyChart(id) {
   if (_chartInstances[id]) { _chartInstances[id].destroy(); delete _chartInstances[id]; }
 }
 
+// Returns paid deposits as invoice-shaped objects for unified revenue calculations
+function _paidDeposits() {
+  return estimatesCache
+    .filter(e => e.deposit_paid && Number(e.deposit_amount) > 0)
+    .map(e => ({
+      client_name: e.client_name,
+      total: Number(e.deposit_amount),
+      paid_at: e.created_at,
+      created_at: e.created_at,
+      _isDeposit: true,
+    }));
+}
+
 function _fmt$(n) {
   return '$' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 }
 
 function buildMiniWidget() {
-  const paid = invoicesCache.filter(i => i.status === 'paid');
+  const allRevenue = [...invoicesCache.filter(i => i.status === 'paid'), ..._paidDeposits()];
   const now = new Date();
-  const paidThisMonth = paid.filter(i => {
+  const paidThisMonth = allRevenue.filter(i => {
     const d = new Date(i.paid_at || i.created_at);
     return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
   });
-  const paidThisYear = paid.filter(i => new Date(i.paid_at || i.created_at).getFullYear() === now.getFullYear());
+  const paidThisYear = allRevenue.filter(i => new Date(i.paid_at || i.created_at).getFullYear() === now.getFullYear());
   const outstanding = invoicesCache.filter(i => i.status === 'pending').reduce((s, i) => s + Number(i.total), 0);
 
   const setEl = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
@@ -2172,7 +2185,7 @@ function buildMiniWidget() {
   for (let m = 5; m >= 0; m--) {
     const d = new Date(now.getFullYear(), now.getMonth() - m, 1);
     labels.push(d.toLocaleString('default', { month: 'short' }));
-    data.push(paid.filter(i => {
+    data.push(allRevenue.filter(i => {
       const p = new Date(i.paid_at || i.created_at);
       return p.getFullYear() === d.getFullYear() && p.getMonth() === d.getMonth();
     }).reduce((s, i) => s + Number(i.total), 0));
@@ -2191,7 +2204,8 @@ function buildMiniWidget() {
 
 function buildAnalytics() {
   if (typeof Chart === 'undefined') return;
-  const paid = invoicesCache.filter(i => i.status === 'paid');
+  const paidInvoices = invoicesCache.filter(i => i.status === 'paid');
+  const paid = [...paidInvoices, ..._paidDeposits()]; // invoices + deposits
   const pending = invoicesCache.filter(i => i.status === 'pending');
   const now = new Date();
   const yr = now.getFullYear(), mo = now.getMonth();
@@ -2208,7 +2222,7 @@ function buildAnalytics() {
   setEl('stat-this-year',    _fmt$(sum(paidYr)));
   setEl('stat-all-time',     _fmt$(sum(paid)));
   setEl('stat-outstanding',  _fmt$(sum(pending)));
-  setEl('stat-avg-invoice',  paid.length ? _fmt$(sum(paid) / paid.length) : '$0');
+  setEl('stat-avg-invoice',  paidInvoices.length ? _fmt$(sum(paidInvoices) / paidInvoices.length) : '$0');
 
   const keyEl = document.getElementById('analytics-key-stats');
   if (keyEl) {
@@ -2226,7 +2240,7 @@ function buildAnalytics() {
       const parts = topMonth[0].split('-');
       return new Date(parts[0], parseInt(parts[1])-1, 1).toLocaleString('default',{month:'long',year:'numeric'});
     })() : '—';
-    const collRate = invoicesCache.length ? Math.round(paid.length/invoicesCache.length*100) : 0;
+    const collRate = invoicesCache.length ? Math.round(paidInvoices.length/invoicesCache.length*100) : 0;
     const estTotal = estimatesCache.length;
     const estApproved = estimatesCache.filter(e => e.status === 'approved').length;
     const convRate = estTotal ? Math.round(estApproved/estTotal*100) : 0;
@@ -2249,7 +2263,7 @@ function buildAnalytics() {
 
   _buildLineChart();
   _buildBarChart(yr, paid);
-  _buildDonutChart(paid, pending);
+  _buildDonutChart(paidInvoices, pending); // donut shows invoice statuses only
   _buildClientsChart(paid);
   _buildEstimatesChart();
 }
@@ -2264,7 +2278,7 @@ function setRevenueRange(months) {
 }
 
 function _buildLineChart() {
-  const paid = invoicesCache.filter(i => i.status === 'paid');
+  const paid = [...invoicesCache.filter(i => i.status === 'paid'), ..._paidDeposits()];
   const now = new Date();
   const labels = [], data = [];
   for (let m = _revenueRange - 1; m >= 0; m--) {
