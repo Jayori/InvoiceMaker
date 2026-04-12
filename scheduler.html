@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <title>Scheduler — Invoice Pro</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="sch-body">
+
+  <!-- PIN Modal -->
+  <div id="pin-modal" class="pin-modal">
+    <div class="pin-card">
+      <div class="pin-logo" id="pin-biz-name">Invoice Pro</div>
+      <h2 class="pin-heading">Manager Access</h2>
+      <form onsubmit="schVerifyPin(event)" autocomplete="off">
+        <input type="password" id="pin-input" class="pin-input" placeholder="Enter PIN" maxlength="20" required autofocus autocomplete="off">
+        <button type="submit" class="btn btn-primary btn-block" id="pin-btn">Enter</button>
+      </form>
+      <div id="pin-error" class="client-error" style="display:none;">Incorrect PIN. Try again.</div>
+      <a href="manager.html" class="client-back">← Back to Manager</a>
+    </div>
+  </div>
+
+  <!-- Scheduler App -->
+  <div id="sch-app" style="display:none;">
+
+    <!-- Header -->
+    <div class="sch-header">
+      <a href="manager.html" class="sch-back-btn">
+        <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 19l-7-7 7-7"/></svg>
+      </a>
+      <div class="sch-header-title">Schedule</div>
+      <button class="sch-header-new-btn" onclick="openNewEventSheet()">
+        <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
+      </button>
+    </div>
+
+    <!-- Events list -->
+    <div class="sch-main">
+      <div id="sch-loading" class="sch-loading-state">Loading events...</div>
+      <div id="sch-empty" class="sch-empty-state" style="display:none;">
+        <svg width="48" height="48" fill="none" viewBox="0 0 24 24" stroke="currentColor" style="color:#d1d5db;margin-bottom:12px;"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+        <div>No upcoming events</div>
+        <div style="font-size:13px;margin-top:4px;">Tap + to schedule one</div>
+      </div>
+      <div id="sch-events" style="display:none;"></div>
+    </div>
+
+    <!-- FAB (floating action button) -->
+    <button class="sch-fab" onclick="openNewEventSheet()" aria-label="New Event">
+      <svg width="28" height="28" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
+    </button>
+
+  </div>
+
+  <!-- ══════════════════════════════════════════════
+       NEW EVENT SHEET
+  ══════════════════════════════════════════════ -->
+  <div id="new-event-overlay" class="sch-overlay" style="display:none;" onclick="overlayClick(event,'new-event-overlay')">
+    <div class="sch-sheet" id="new-event-sheet">
+      <div class="sch-sheet-handle"></div>
+      <div class="sch-sheet-top">
+        <div class="sch-sheet-title" id="new-event-sheet-title">New Event</div>
+        <button class="sch-close-btn" onclick="closeNewEventSheet()">
+          <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+
+      <div class="sch-sheet-body">
+
+        <!-- Client info -->
+        <div class="sch-section-label">Client</div>
+        <div class="sch-client-search-wrap">
+          <input type="text" id="new-client-name" class="sch-input" placeholder="Client name *" autocomplete="off" oninput="onClientNameInput(this.value)">
+          <div id="client-suggestions" class="sch-suggestions" style="display:none;"></div>
+        </div>
+        <input type="email" id="new-client-email" class="sch-input" placeholder="Email address *" style="margin-top:10px;">
+        <div class="sch-phone-row" style="margin-top:10px;">
+          <select id="new-cc" class="sch-cc-select">
+            <option value="+1">+1 US</option>
+            <option value="+1-CA">+1 CA</option>
+            <option value="+44">+44 UK</option>
+            <option value="+61">+61 AU</option>
+          </select>
+          <input type="tel" id="new-client-phone" class="sch-input" placeholder="Phone (for SMS)" style="flex:1;">
+        </div>
+
+        <!-- Date & Time -->
+        <div class="sch-section-label" style="margin-top:20px;">Date & Time</div>
+        <div class="sch-date-time-row">
+          <input type="date" id="new-event-date" class="sch-input" style="flex:1.2;">
+          <input type="time" id="new-event-time" class="sch-input" style="flex:1;">
+        </div>
+        <div style="margin-top:10px;">
+          <select id="new-event-duration" class="sch-input">
+            <option value="30">30 minutes</option>
+            <option value="60" selected>1 hour</option>
+            <option value="90">1.5 hours</option>
+            <option value="120">2 hours</option>
+            <option value="180">3 hours</option>
+            <option value="240">4 hours</option>
+            <option value="480">All day (8 hrs)</option>
+          </select>
+        </div>
+
+        <!-- Service call presets -->
+        <div class="sch-section-label" style="margin-top:20px;">Service Call Fee <span style="font-size:12px;font-weight:400;color:#9ca3af;">optional</span></div>
+        <div class="sch-sc-presets" id="sc-presets">
+          <button type="button" class="sch-sc-btn" onclick="selectServiceCall(this, 75, 'Service Call')">$75</button>
+          <button type="button" class="sch-sc-btn" onclick="selectServiceCall(this, 100, 'Service Call')">$100</button>
+          <button type="button" class="sch-sc-btn" onclick="selectServiceCall(this, 125, 'Service Call')">$125</button>
+          <button type="button" class="sch-sc-btn" onclick="selectServiceCall(this, 150, 'Service Call')">$150</button>
+          <button type="button" class="sch-sc-btn" onclick="selectServiceCall(this, 200, 'Service Call')">$200</button>
+          <button type="button" class="sch-sc-btn sch-sc-custom-btn" onclick="toggleCustomSC()">Custom</button>
+        </div>
+        <div id="sc-custom-row" style="display:none;margin-top:10px;">
+          <div style="display:flex;gap:8px;align-items:center;">
+            <span style="font-size:18px;font-weight:700;color:#374151;">$</span>
+            <input type="number" id="sc-custom-amount" class="sch-input" placeholder="0.00" min="0" step="0.01" style="width:120px;" oninput="onCustomSCInput()">
+            <input type="text" id="sc-custom-desc" class="sch-input" placeholder="Description" style="flex:1;" oninput="onCustomSCInput()">
+          </div>
+        </div>
+        <div id="sc-selected-display" style="display:none;margin-top:8px;padding:8px 12px;background:#f0fdf4;border-radius:8px;border:1px solid #bbf7d0;font-size:13px;color:#166534;font-weight:600;align-items:center;justify-content:space-between;">
+          <span id="sc-selected-text"></span>
+          <button type="button" onclick="clearServiceCall()" style="background:none;border:none;cursor:pointer;color:#6b7280;font-size:16px;padding:0 4px;">✕</button>
+        </div>
+
+        <!-- Notes -->
+        <div class="sch-section-label" style="margin-top:20px;">Notes <span style="font-size:12px;font-weight:400;color:#9ca3af;">optional</span></div>
+        <textarea id="new-event-notes" class="sch-input sch-textarea" placeholder="Address, job description, special instructions..."></textarea>
+
+        <!-- Notifications -->
+        <div class="sch-notify-row">
+          <label class="sch-check-label">
+            <input type="checkbox" id="notify-email" checked>
+            <span>Send confirmation email</span>
+          </label>
+          <label class="sch-check-label">
+            <input type="checkbox" id="notify-sms" checked>
+            <span>Send confirmation SMS</span>
+          </label>
+        </div>
+
+        <!-- Action buttons -->
+        <div class="sch-sheet-actions">
+          <button class="btn btn-primary sch-action-btn" id="new-event-submit-btn" onclick="submitNewEvent('schedule')">
+            Schedule Event
+          </button>
+          <div class="sch-action-split">
+            <button class="btn sch-action-split-btn" onclick="submitNewEvent('invoice')">
+              <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+              + Invoice
+            </button>
+            <button class="btn sch-action-split-btn" onclick="submitNewEvent('estimate')">
+              <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+              + Estimate
+            </button>
+          </div>
+        </div>
+
+        <div id="new-event-error" style="display:none;margin-top:10px;padding:10px 14px;background:#fef2f2;border-radius:8px;border:1px solid #fecaca;color:#dc2626;font-size:14px;"></div>
+
+      </div><!-- /sch-sheet-body -->
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════
+       EVENT DETAIL SHEET
+  ══════════════════════════════════════════════ -->
+  <div id="detail-overlay" class="sch-overlay" style="display:none;" onclick="overlayClick(event,'detail-overlay')">
+    <div class="sch-sheet" id="detail-sheet">
+      <div class="sch-sheet-handle"></div>
+      <div class="sch-sheet-top">
+        <div class="sch-sheet-title" id="detail-client-name">Event</div>
+        <button class="sch-close-btn" onclick="closeDetailSheet()">
+          <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <div class="sch-sheet-body" id="detail-sheet-body">
+        <!-- Populated by JS -->
+      </div>
+    </div>
+  </div>
+
+  <script src="scheduler.js"></script>
+</body>
+</html>

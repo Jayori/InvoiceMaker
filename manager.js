@@ -27,6 +27,7 @@ async function verifyPin(e) {
     const data = await res.json();
     if (data.ok) {
       sessionStorage.setItem('mgr_auth', '1');
+      sessionStorage.setItem('mgr_pin', pin);
       initManager();
     } else {
       errEl.style.display = '';
@@ -48,6 +49,58 @@ function initManager() {
   loadInvoices();
   loadEstimates();
   loadClients();
+  handleSchedulerPrefill();
+}
+
+function handleSchedulerPrefill() {
+  const params = new URLSearchParams(window.location.search);
+  if (!params.get('prefill')) return;
+  window.history.replaceState({}, '', window.location.pathname);
+  const tab = params.get('tab') || 'new-invoice';
+  const clientName  = params.get('client_name') || '';
+  const clientEmail = params.get('client_email') || '';
+  const clientPhone = params.get('client_phone') || '';
+  const scAmount    = params.get('sc_amount') || '';
+  const scDesc      = params.get('sc_desc') || 'Service Call';
+  // Navigate to target tab
+  setTimeout(() => {
+    showTab(tab);
+    if (tab === 'new-invoice') {
+      const setField = (id, val) => { const el = document.getElementById(id); if (el && val) el.value = val; };
+      setField('inv-client-name', clientName);
+      setField('inv-client-email', clientEmail);
+      setField('inv-client-phone', clientPhone);
+      // Pre-fill service call as first line item if present
+      if (scAmount) {
+        const itemsWrap = document.getElementById('inv-items');
+        if (itemsWrap) {
+          const rows = itemsWrap.querySelectorAll('.item-row');
+          if (rows.length > 0) {
+            rows[0].querySelector('.item-desc')?.setAttribute('value', scDesc);
+            const descEl = rows[0].querySelector('.item-desc'); if (descEl) descEl.value = scDesc;
+            const priceEl = rows[0].querySelector('.item-price'); if (priceEl) priceEl.value = scAmount;
+            const qtyEl = rows[0].querySelector('.item-qty'); if (qtyEl) qtyEl.value = '1';
+          }
+        }
+      }
+    } else if (tab === 'new-estimate') {
+      const setField = (id, val) => { const el = document.getElementById(id); if (el && val) el.value = val; };
+      setField('est-client-name', clientName);
+      setField('est-client-email', clientEmail);
+      setField('est-client-phone', clientPhone);
+      if (scAmount) {
+        const itemsWrap = document.getElementById('est-items');
+        if (itemsWrap) {
+          const rows = itemsWrap.querySelectorAll('.item-row');
+          if (rows.length > 0) {
+            const descEl = rows[0].querySelector('.item-desc'); if (descEl) descEl.value = scDesc;
+            const priceEl = rows[0].querySelector('.item-price'); if (priceEl) priceEl.value = scAmount;
+            const qtyEl = rows[0].querySelector('.item-qty'); if (qtyEl) qtyEl.value = '1';
+          }
+        }
+      }
+    }
+  }, 200);
 }
 
 // Check session on load
@@ -69,7 +122,8 @@ function showTab(name, link) {
   allNav.forEach(a => { if (a.getAttribute('onclick')?.includes(`'${name}'`)) a.classList.add('active'); });
   if (name === 'dashboard') { loadInvoices(); loadEstimates(); }
   if (name === 'clients') loadClients();
-  if (name === 'settings') loadBusinessProfiles();
+  if (name === 'schedule') loadSchedule();
+  if (name === 'settings') { loadBusinessProfiles(); loadGcalStatus(); handleGcalRedirect(); }
   if (name === 'analytics') buildAnalytics();
 }
 
@@ -219,9 +273,9 @@ async function loadInvoices() {
 
     tbody.innerHTML = invoices.map(inv => `
       <tr onclick="previewInvoice('${inv.id}')" style="cursor:pointer;" title="Click to preview">
-        <td><div class="client-name">${esc(inv.client_name)}</div><div class="invoice-num">${esc(inv.client_email)}</div></td>
+        <td><div class="client-name" style="cursor:pointer;text-decoration:underline;text-underline-offset:2px;text-decoration-color:var(--gray-300);" onclick="event.stopPropagation();openClientModalByEmail('${escAttr(inv.client_name)}','${escAttr(inv.client_email||'')}')" title="View client">${esc(inv.client_name)}</div><div class="invoice-num">${esc(inv.client_email)}</div></td>
         <td>${esc(inv.invoice_number)}</td>
-        <td onclick="event.stopPropagation()"><code style="cursor:pointer;font-size:13px;letter-spacing:0.1em;background:var(--gray-100);padding:2px 6px;border-radius:4px;" onclick="copyPasscode('${escAttr(inv.passcode||'')}',this)" title="Click to copy">${esc(inv.passcode || '—')}</code></td>
+        <td onclick="event.stopPropagation();copyCode('${escAttr(inv.passcode||'')}',this)" title="Click to copy" style="cursor:pointer;"><code style="font-size:13px;letter-spacing:0.1em;background:var(--gray-100);padding:2px 6px;border-radius:4px;">${esc(inv.passcode || '—')}</code></td>
         <td>${formatDate(inv.created_at)}</td>
         <td>${inv.due_date ? formatDate(inv.due_date) : '—'}</td>
         <td class="amount">$${Number(inv.total).toFixed(2)}</td>
@@ -382,6 +436,7 @@ async function submitInvoice(e) {
     sendEmail: document.getElementById('inv-send-email').checked,
     sendSmsNotification: document.getElementById('inv-send-sms').checked,
     receiptPhotos,
+    ...getInvSchedData(),
   };
 
   // Optionally save client
@@ -432,18 +487,359 @@ function resetInvoiceForm() {
   recalcTotals();
 }
 
+// ─── Calendar ──────────────────────────────────────────────────────────────────
+
+let calEvents = [];
+let calYear = new Date().getFullYear();
+let calMonth = new Date().getMonth();
+
+async function loadSchedule() {
+  try {
+    const res = await fetch('/api/get-scheduled-events?upcoming=1');
+    calEvents = await res.json();
+  } catch { calEvents = []; }
+  renderUpcoming();
+  renderCalendarGrid();
+}
+
+// Keep old name as alias
+function loadCalendar() { return loadSchedule(); }
+
+function renderUpcoming() {
+  const wrap = document.getElementById('upcoming-events');
+  const empty = document.getElementById('upcoming-empty');
+  if (!wrap) return;
+  const now = new Date();
+  const upcoming = calEvents.filter(e => new Date(e.scheduled_at) >= now).slice(0, 12);
+  if (!upcoming.length) { wrap.style.display = 'none'; if (empty) empty.style.display = ''; return; }
+  wrap.style.display = 'flex';
+  if (empty) empty.style.display = 'none';
+  wrap.innerHTML = upcoming.map(e => {
+    const d = new Date(e.scheduled_at);
+    const dateStr = d.toLocaleDateString('en-US', { weekday:'short', month:'short', day:'numeric' });
+    const timeStr = d.toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit' });
+    const durMins = e.duration_mins || e.scheduled_duration;
+    const dur = durMins ? ` &middot; ${durMins >= 60 ? (durMins/60)+'h' : durMins+'m'}` : '';
+    const scBadge = e.service_call?.amount ? `<span style="font-size:11px;background:#fef3c7;color:#92400e;padding:2px 7px;border-radius:99px;font-weight:700;">$${Number(e.service_call.amount).toFixed(0)} fee</span>` : '';
+    const typeLabel = e.type === 'invoice' ? 'Invoice' : e.type === 'estimate' ? 'Estimate' : 'Event';
+    const typeClass = e.type === 'invoice' ? 'type-invoice' : e.type === 'estimate' ? 'type-estimate' : 'type-event';
+    return `<div class="upcoming-event-card">
+      <div class="upcoming-event-date">${dateStr} &middot; ${timeStr}${dur}</div>
+      <div class="upcoming-event-client">${esc(e.client_name)}</div>
+      ${e.notes ? `<div style="font-size:12px;color:var(--gray-400);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(e.notes)}</div>` : ''}
+      <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap;align-items:center;">
+        <span class="upcoming-event-type ${typeClass}">${typeLabel}</span>
+        ${scBadge}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderCalendarGrid() {
+  const titleEl = document.getElementById('cal-month-title');
+  const grid = document.getElementById('cal-grid');
+  if (!titleEl || !grid) return;
+
+  const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  titleEl.textContent = `${monthNames[calMonth]} ${calYear}`;
+
+  const today = new Date();
+  const firstDay = new Date(calYear, calMonth, 1).getDay();
+  const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
+  const daysInPrev = new Date(calYear, calMonth, 0).getDate();
+
+  // Build event map: dateStr → events[]
+  const eventMap = {};
+  calEvents.forEach(e => {
+    const d = new Date(e.scheduled_at);
+    const key = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+    if (!eventMap[key]) eventMap[key] = [];
+    eventMap[key].push(e);
+  });
+
+  let cells = '';
+  // Prev month filler
+  for (let i = firstDay - 1; i >= 0; i--) {
+    cells += `<div class="cal-day cal-other-month"><span class="cal-day-num">${daysInPrev - i}</span></div>`;
+  }
+  // Current month
+  for (let d = 1; d <= daysInMonth; d++) {
+    const key = `${calYear}-${calMonth}-${d}`;
+    const dayEvents = eventMap[key] || [];
+    const isToday = today.getFullYear() === calYear && today.getMonth() === calMonth && today.getDate() === d;
+    const hasEvents = dayEvents.length > 0;
+    const dateStr = `${calYear}-${String(calMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const dots = dayEvents.map(e => `<div class="cal-dot ${e.type === 'estimate' ? 'dot-estimate' : e.type === 'event' ? 'dot-event' : ''}"></div>`).join('');
+    cells += `<div class="cal-day${isToday ? ' cal-today' : ''}${hasEvents ? ' cal-has-events' : ''}" onclick="showCalDay('${dateStr}')">
+      <span class="cal-day-num">${d}</span>
+      ${hasEvents ? `<div class="cal-dots">${dots}</div>` : ''}
+    </div>`;
+  }
+  // Next month filler
+  const total = firstDay + daysInMonth;
+  const remaining = total % 7 === 0 ? 0 : 7 - (total % 7);
+  for (let d = 1; d <= remaining; d++) {
+    cells += `<div class="cal-day cal-other-month"><span class="cal-day-num">${d}</span></div>`;
+  }
+  grid.innerHTML = cells;
+}
+
+function calNav(dir) {
+  calMonth += dir;
+  if (calMonth > 11) { calMonth = 0; calYear++; }
+  if (calMonth < 0) { calMonth = 11; calYear--; }
+  document.getElementById('cal-day-detail').style.display = 'none';
+  renderCalendarGrid();
+}
+
+function showCalDay(dateStr) {
+  const detail = document.getElementById('cal-day-detail');
+  if (!detail) return;
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const dayEvents = calEvents.filter(e => {
+    const ev = new Date(e.scheduled_at);
+    return ev.getFullYear() === y && ev.getMonth() === m - 1 && ev.getDate() === d;
+  });
+  // Highlight selected day
+  document.querySelectorAll('.cal-day').forEach(el => el.classList.remove('cal-selected'));
+  event?.target?.closest('.cal-day')?.classList.add('cal-selected');
+
+  if (!dayEvents.length) { detail.style.display = 'none'; return; }
+  const label = new Date(dateStr + 'T12:00:00').toLocaleDateString('en-US', { weekday:'long', month:'long', day:'numeric' });
+  detail.style.display = '';
+  detail.innerHTML = `<div style="font-size:13px;font-weight:700;color:var(--gray-700);margin-bottom:10px;">${label}</div>` +
+    dayEvents.map(e => {
+      const t = new Date(e.scheduled_at).toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit' });
+      const dur = e.scheduled_duration ? ` &middot; ${e.scheduled_duration} min` : '';
+      return `<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--gray-100);">
+        <div style="flex:1;">
+          <div style="font-weight:600;color:var(--gray-900);">${esc(e.client_name)}</div>
+          <div style="font-size:12px;color:var(--gray-500);">${t}${dur} &middot; ${esc(e.label)}</div>
+        </div>
+        <span class="upcoming-event-type ${e.type === 'invoice' ? 'type-invoice' : e.type === 'estimate' ? 'type-estimate' : 'type-event'}">${e.type === 'invoice' ? 'Invoice' : e.type === 'estimate' ? 'Estimate' : 'Event'}</span>
+      </div>`;
+    }).join('');
+}
+
 // ─── Clients ───────────────────────────────────────────────────────────────────
 
 let clientsCache = [];
+let clientViewMode = 'card';
+let activeClientId = null;
+
+// Avatar color based on name
+function clientAvatarColor(name) {
+  const colors = ['#1a56db','#0f766e','#7c3aed','#db2777','#d97706','#059669','#dc2626','#2563eb'];
+  let hash = 0;
+  for (const ch of (name || '')) hash = ch.charCodeAt(0) + ((hash << 5) - hash);
+  return colors[Math.abs(hash) % colors.length];
+}
+
+function clientInitials(name) {
+  const parts = (name || '').trim().split(' ');
+  return (parts[0]?.[0] || '') + (parts[1]?.[0] || '');
+}
+
+function setClientView(mode) {
+  clientViewMode = mode;
+  document.getElementById('client-view-card-btn').classList.toggle('client-view-active', mode === 'card');
+  document.getElementById('client-view-list-btn').classList.toggle('client-view-active', mode === 'list');
+  const grid = document.getElementById('clients-card-grid');
+  const table = document.getElementById('clients-table');
+  if (!clientsCache.length) return;
+  if (mode === 'card') { if (grid) grid.style.display = ''; if (table) table.style.display = 'none'; }
+  else { if (grid) grid.style.display = 'none'; if (table) table.style.display = ''; }
+}
+
+// ─── Client action modal ───────────────────────────────────────────────────────
+
+let prevTab = 'clients';
+let activeClientEmail = '';
+
+function openClientModal(id) {
+  const c = clientsCache.find(x => x.id === id);
+  if (!c) return;
+  activeClientId = id;
+  activeClientEmail = c.email || '';
+  const color = clientAvatarColor(c.name);
+  const initials = clientInitials(c.name).toUpperCase();
+  const avatar = document.getElementById('cm-avatar');
+  avatar.style.background = color;
+  avatar.textContent = initials;
+  document.getElementById('cm-name').textContent = c.name;
+  document.getElementById('cm-meta').textContent = [c.company, c.email, c.phone].filter(Boolean).join(' · ');
+  const overlay = document.getElementById('client-modal-overlay');
+  overlay.style.display = 'flex';
+}
+
+function openClientModalByEmail(name, email) {
+  const c = clientsCache.find(x => x.email?.toLowerCase() === email?.toLowerCase());
+  if (c) { openClientModal(c.id); return; }
+  // Client exists in invoices/estimates but not saved — show modal with limited options
+  activeClientId = null;
+  activeClientEmail = email || '';
+  const color = clientAvatarColor(name);
+  const initials = clientInitials(name).toUpperCase();
+  const avatar = document.getElementById('cm-avatar');
+  avatar.style.background = color;
+  avatar.textContent = initials;
+  document.getElementById('cm-name').textContent = name;
+  document.getElementById('cm-meta').textContent = email || '';
+  document.getElementById('client-modal-overlay').style.display = 'flex';
+}
+
+function closeClientModal() {
+  document.getElementById('client-modal-overlay').style.display = 'none';
+}
+
+function cmSchedule() {
+  const c = activeClientId ? clientsCache.find(x => x.id === activeClientId) : null;
+  closeClientModal();
+  showTab('schedule');
+  setTimeout(() => openSchedModal(c), 100);
+}
+
+function cmEstimate() {
+  const c = activeClientId ? clientsCache.find(x => x.id === activeClientId) : null;
+  closeClientModal();
+  showTab('new-estimate');
+  if (c) setTimeout(() => fillEstimateClient(c.id), 50);
+}
+
+function cmInvoice() {
+  const c = activeClientId ? clientsCache.find(x => x.id === activeClientId) : null;
+  closeClientModal();
+  showTab('new-invoice');
+  if (c) setTimeout(() => fillClient(c.id), 50);
+}
+
+function cmViewProfile() {
+  const c = activeClientId ? clientsCache.find(x => x.id === activeClientId) : null;
+  const name = c?.name || document.getElementById('cm-name').textContent;
+  const email = activeClientEmail;
+  const id = c?.id || null;
+  closeClientModal();
+  showClientProfile(email, name, id);
+}
+
+// ─── Client profile dashboard ──────────────────────────────────────────────────
+
+function showClientProfile(email, name, clientId) {
+  // remember origin tab
+  const active = document.querySelector('.mgr-tab:not([style*="display:none"])');
+  if (active) prevTab = active.id.replace('tab-', '');
+
+  showTab('client-profile');
+
+  const c = (clientId && clientsCache.find(x => x.id === clientId)) || { name, email };
+  const color = clientAvatarColor(c.name);
+  const initials = clientInitials(c.name).toUpperCase();
+
+  const avatar = document.getElementById('cp-avatar');
+  avatar.style.background = color;
+  avatar.textContent = initials;
+  document.getElementById('cp-name').textContent = c.name;
+  document.getElementById('cp-meta').textContent = [c.company, c.email, c.phone].filter(Boolean).join(' · ');
+
+  const codeWrap = document.getElementById('cp-code-wrap');
+  if (c.passcode) {
+    codeWrap.innerHTML = `<span style="font-size:12px;color:var(--gray-500);">Access Code:</span>
+      <code onclick="copyCode('${escAttr(c.passcode)}',this)" style="font-size:14px;letter-spacing:0.12em;background:var(--gray-100);padding:3px 10px;border-radius:6px;cursor:pointer;font-family:monospace;" title="Click to copy">${esc(c.passcode)}</code>`;
+  } else {
+    codeWrap.innerHTML = '';
+  }
+
+  const emailLower = (email || '').toLowerCase();
+  const clientInvoices = invoicesCache.filter(i => i.client_email?.toLowerCase() === emailLower);
+  const clientEstimates = estimatesCache.filter(e => e.client_email?.toLowerCase() === emailLower);
+
+  const totalBilled = clientInvoices.reduce((s, i) => s + Number(i.total || 0), 0);
+  const paid = clientInvoices.filter(i => i.status === 'paid').reduce((s, i) => s + Number(i.total || 0), 0);
+  const outstanding = totalBilled - paid;
+
+  document.getElementById('cp-stats').innerHTML = `
+    <div class="stat-card"><div class="stat-value">$${totalBilled.toFixed(2)}</div><div class="stat-label">Total Billed</div></div>
+    <div class="stat-card"><div class="stat-value" style="color:#166534;">$${paid.toFixed(2)}</div><div class="stat-label">Paid</div></div>
+    <div class="stat-card"><div class="stat-value" style="color:#dc2626;">$${outstanding.toFixed(2)}</div><div class="stat-label">Outstanding</div></div>
+    <div class="stat-card"><div class="stat-value">${clientEstimates.length}</div><div class="stat-label">Estimates</div></div>
+    <div class="stat-card"><div class="stat-value">${clientInvoices.length}</div><div class="stat-label">Invoices</div></div>
+  `;
+
+  const now = new Date();
+  const upcoming = [
+    ...clientInvoices.filter(i => i.scheduled_at && new Date(i.scheduled_at) > now).map(i => ({ ...i, docType: 'invoice', label: i.invoice_number })),
+    ...clientEstimates.filter(e => e.scheduled_at && new Date(e.scheduled_at) > now).map(e => ({ ...e, docType: 'estimate', label: e.estimate_number })),
+  ].sort((a, b) => new Date(a.scheduled_at) - new Date(b.scheduled_at));
+
+  const upcomingEl = document.getElementById('cp-upcoming');
+  upcomingEl.innerHTML = upcoming.length
+    ? upcoming.map(ev => `
+        <div style="display:flex;align-items:center;gap:14px;padding:10px 0;border-bottom:1px solid var(--gray-100);">
+          <div style="min-width:80px;font-size:12px;font-weight:700;color:var(--gray-500);">${formatDate(ev.scheduled_at)}</div>
+          <div style="flex:1;font-size:14px;font-weight:600;color:var(--gray-900);">${esc(ev.label)}</div>
+          <div style="font-size:14px;color:var(--gray-700);">$${Number(ev.total).toFixed(2)}</div>
+          <span class="upcoming-event-type type-${ev.docType}">${ev.docType}</span>
+        </div>`).join('')
+    : '<div style="color:var(--gray-400);font-size:13px;padding:12px 0;">No upcoming scheduled jobs.</div>';
+
+  const invEl = document.getElementById('cp-invoices');
+  invEl.innerHTML = clientInvoices.length
+    ? `<table class="invoice-table" style="margin-top:6px;">
+        <thead><tr><th>Invoice #</th><th>Passcode</th><th>Date</th><th>Amount</th><th>Status</th></tr></thead>
+        <tbody>${clientInvoices.map(inv => `
+          <tr onclick="previewInvoice('${inv.id}')" style="cursor:pointer;">
+            <td>${esc(inv.invoice_number)}</td>
+            <td onclick="copyCode('${escAttr(inv.passcode||'')}',this);event.stopPropagation();" style="cursor:pointer;" title="Click to copy"><code style="font-size:12px;letter-spacing:0.1em;background:var(--gray-100);padding:2px 6px;border-radius:4px;">${esc(inv.passcode || '—')}</code></td>
+            <td>${formatDate(inv.created_at)}</td>
+            <td class="amount">$${Number(inv.total).toFixed(2)}</td>
+            <td><span class="badge badge-${inv.status}">${capitalize(inv.status)}</span></td>
+          </tr>`).join('')}
+        </tbody></table>`
+    : '<div style="color:var(--gray-400);font-size:13px;padding:12px 0;">No invoices yet.</div>';
+
+  const estEl = document.getElementById('cp-estimates');
+  estEl.innerHTML = clientEstimates.length
+    ? `<table class="invoice-table" style="margin-top:6px;">
+        <thead><tr><th>Estimate #</th><th>Passcode</th><th>Date</th><th>Amount</th><th>Status</th></tr></thead>
+        <tbody>${clientEstimates.map(est => {
+          const sc = est.status === 'approved' ? 'paid' : est.status === 'rejected' ? 'rejected' : 'pending';
+          return `<tr onclick="previewEstimate('${est.id}')" style="cursor:pointer;">
+            <td>${esc(est.estimate_number)}</td>
+            <td onclick="copyCode('${escAttr(est.passcode||'')}',this);event.stopPropagation();" style="cursor:pointer;" title="Click to copy"><code style="font-size:12px;letter-spacing:0.1em;background:var(--gray-100);padding:2px 6px;border-radius:4px;">${esc(est.passcode || '—')}</code></td>
+            <td>${formatDate(est.created_at)}</td>
+            <td class="amount">$${Number(est.total).toFixed(2)}</td>
+            <td><span class="badge badge-${sc}">${capitalize(est.status)}</span></td>
+          </tr>`;
+        }).join('')}
+        </tbody></table>`
+    : '<div style="color:var(--gray-400);font-size:13px;padding:12px 0;">No estimates yet.</div>';
+}
+
+function backFromProfile() {
+  showTab(prevTab || 'clients');
+}
+
+// ─── Copy utility ──────────────────────────────────────────────────────────────
+
+function copyCode(text, el) {
+  if (!text || text === '—') return;
+  navigator.clipboard.writeText(text).then(() => {
+    showToast('Copied to clipboard!', 'success');
+  }).catch(() => {
+    showToast('Copy failed — try manually.', 'error');
+  });
+}
 
 async function loadClients() {
   const loading = document.getElementById('clients-loading');
   const table = document.getElementById('clients-table');
   const empty = document.getElementById('clients-empty');
   const tbody = document.getElementById('clients-tbody');
+  const grid = document.getElementById('clients-card-grid');
 
   if (loading) loading.style.display = '';
   if (table) table.style.display = 'none';
+  if (grid) grid.style.display = 'none';
   if (empty) empty.style.display = 'none';
 
   try {
@@ -458,25 +854,122 @@ async function loadClients() {
     }
     populateEstimateClientDropdown();
 
-    if (!loading) return;
-    loading.style.display = 'none';
+    if (loading) loading.style.display = 'none';
     if (!clientsCache.length) { if (empty) empty.style.display = ''; return; }
 
+    // Detect duplicates (same email)
+    const emailGroups = {};
+    clientsCache.forEach(c => {
+      const key = (c.email || '').toLowerCase().trim();
+      if (!emailGroups[key]) emailGroups[key] = [];
+      emailGroups[key].push(c);
+    });
+    const dupGroups = Object.values(emailGroups).filter(g => g.length > 1);
+    renderDupBanner(dupGroups);
+
+    // Card view
+    if (grid) {
+      grid.innerHTML = clientsCache.map(c => {
+        const color = clientAvatarColor(c.name);
+        const initials = clientInitials(c.name).toUpperCase();
+        const isDup = emailGroups[(c.email||'').toLowerCase().trim()]?.length > 1;
+        return `<div class="client-card${isDup ? ' client-card-dup' : ''}" data-id="${c.id}" onclick="openClientModal('${c.id}')">
+          ${isDup ? `<div class="dup-badge" title="Duplicate — click Merge to clean up">duplicate</div>` : ''}
+          <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;">
+            <div class="client-avatar" style="background:${color};">${esc(initials)}</div>
+            <div>
+              <div class="client-card-name">${esc(c.name)}</div>
+              ${c.company ? `<div class="client-card-company">${esc(c.company)}</div>` : ''}
+            </div>
+          </div>
+          ${c.email ? `<div class="client-card-detail"><svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>${esc(c.email)}</div>` : ''}
+          ${c.phone ? `<div class="client-card-detail"><svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>${esc(c.phone)}</div>` : ''}
+          ${c.passcode ? `<div class="client-card-detail" style="margin-top:6px;" onclick="event.stopPropagation();copyCode('${escAttr(c.passcode)}',this)" title="Click to copy access code"><svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/></svg><code style="font-size:11px;letter-spacing:0.12em;background:var(--gray-100);padding:1px 5px;border-radius:4px;cursor:pointer;">${esc(c.passcode)}</code><svg width="10" height="10" fill="none" viewBox="0 0 24 24" stroke="currentColor" style="opacity:0.4;"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg></div>` : ''}
+          <div class="client-card-actions" onclick="event.stopPropagation()">
+            <button class="btn btn-sm btn-secondary" onclick="editClient('${c.id}')">Edit</button>
+            <button class="btn btn-sm" style="background:#fee2e2;color:#dc2626;border:none;" onclick="deleteClient('${c.id}')">Delete</button>
+          </div>
+        </div>`;
+      }).join('');
+    }
+
+    // List view
     if (tbody) tbody.innerHTML = clientsCache.map(c => `
-      <tr>
-        <td class="client-name">${esc(c.name)}</td>
+      <tr style="cursor:pointer;" onclick="openClientModal('${c.id}')">
+        <td class="client-name" style="font-weight:600;">${esc(c.name)}</td>
         <td>${esc(c.email)}</td>
         <td>${esc(c.phone || '—')}</td>
         <td>${esc(c.company || '—')}</td>
-        <td><code style="font-size:13px;letter-spacing:0.1em;background:var(--gray-100);padding:2px 6px;border-radius:4px;">${esc(c.passcode || '—')}</code></td>
-        <td style="display:flex;gap:8px;flex-wrap:wrap;">
+        <td onclick="event.stopPropagation();copyCode('${escAttr(c.passcode||'')}',this)" title="Click to copy"><code style="font-size:13px;letter-spacing:0.1em;background:var(--gray-100);padding:2px 6px;border-radius:4px;cursor:pointer;">${esc(c.passcode || '—')}</code></td>
+        <td style="display:flex;gap:8px;flex-wrap:wrap;" onclick="event.stopPropagation()">
           <button class="btn btn-sm btn-secondary" onclick="editClient('${c.id}')">Edit</button>
           <button class="btn btn-sm btn-secondary" onclick="regenClientCode('${c.id}', '${escAttr(c.name)}')">New Code</button>
           <button class="btn btn-sm" style="background:#fee2e2;color:#dc2626;border:none;" onclick="deleteClient('${c.id}')">Delete</button>
         </td>
       </tr>`).join('');
-    if (table) table.style.display = '';
+
+    setClientView(clientViewMode);
   } catch { if (loading) loading.textContent = 'Failed to load clients.'; }
+}
+
+function renderDupBanner(dupGroups) {
+  let banner = document.getElementById('dup-merge-banner');
+  if (!dupGroups.length) { if (banner) banner.remove(); return; }
+  if (!banner) {
+    banner = document.createElement('div');
+    banner.id = 'dup-merge-banner';
+    const grid = document.getElementById('clients-card-grid');
+    grid?.parentNode?.insertBefore(banner, grid);
+  }
+  const totalDups = dupGroups.reduce((s, g) => s + g.length - 1, 0);
+  banner.innerHTML = `<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;padding:12px 16px;background:#fef3c7;border:1px solid #f59e0b;border-radius:10px;margin-bottom:14px;">
+    <span style="font-size:14px;color:#92400e;font-weight:600;">&#9888; ${totalDups} duplicate client record${totalDups > 1 ? 's' : ''} found — same email, multiple entries.</span>
+    <button class="btn btn-sm" style="background:#f59e0b;color:#fff;border:none;font-weight:700;" onclick="mergeAllDuplicates()">Merge All Duplicates</button>
+  </div>`;
+}
+
+async function mergeAllDuplicates() {
+  if (!confirm('This will merge duplicate clients with the same email into one record, keeping the most complete entry. Continue?')) return;
+
+  const emailGroups = {};
+  clientsCache.forEach(c => {
+    const key = (c.email || '').toLowerCase().trim();
+    if (!emailGroups[key]) emailGroups[key] = [];
+    emailGroups[key].push(c);
+  });
+
+  const dupGroups = Object.values(emailGroups).filter(g => g.length > 1);
+  let deleted = 0;
+
+  for (const group of dupGroups) {
+    // Pick best record: prefer one with passcode, then most fields filled
+    const score = c => (c.passcode ? 10 : 0) + [c.phone, c.company, c.address, c.notes].filter(Boolean).length;
+    group.sort((a, b) => score(b) - score(a));
+    const keep = group[0];
+    const discard = group.slice(1);
+
+    // Ensure the keeper has a passcode (copy from discards if needed)
+    if (!keep.passcode) {
+      const withCode = discard.find(c => c.passcode);
+      if (withCode) {
+        await fetch('/api/save-client', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: keep.id, passcode: withCode.passcode }),
+        });
+      }
+    }
+
+    for (const c of discard) {
+      await fetch(`/api/delete-client`, {
+        method: 'DELETE', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: c.id }),
+      });
+      deleted++;
+    }
+  }
+
+  await loadClients();
+  showToast(`Merged ${deleted} duplicate record${deleted !== 1 ? 's' : ''}.`, 'success');
 }
 
 function fillClient(id) {
@@ -490,6 +983,19 @@ function fillClient(id) {
   document.getElementById('client-city').value = c.city || '';
   document.getElementById('client-state').value = c.state || '';
   document.getElementById('client-zip').value = c.zip || '';
+}
+
+function fillEstimateClient(id) {
+  const c = clientsCache.find(x => x.id === id);
+  if (!c) return;
+  document.getElementById('est-client-name').value = c.name || '';
+  document.getElementById('est-client-email').value = c.email || '';
+  document.getElementById('est-client-phone').value = c.phone || '';
+  document.getElementById('est-client-company').value = c.company || '';
+  document.getElementById('est-client-address').value = c.address || '';
+  document.getElementById('est-client-city').value = c.city || '';
+  document.getElementById('est-client-state').value = c.state || '';
+  document.getElementById('est-client-zip').value = c.zip || '';
 }
 
 function showClientForm() {
@@ -920,9 +1426,9 @@ async function loadEstimates() {
         : '—';
       const statusColor = est.status === 'approved' ? 'paid' : est.status === 'rejected' ? 'rejected' : 'pending';
       return `<tr onclick="previewEstimate('${est.id}')" style="cursor:pointer;" title="Click to preview">
-        <td><div class="client-name">${esc(est.client_name)}</div><div class="invoice-num">${esc(est.client_email)}</div></td>
+        <td><div class="client-name" style="cursor:pointer;text-decoration:underline;text-underline-offset:2px;text-decoration-color:var(--gray-300);" onclick="event.stopPropagation();openClientModalByEmail('${escAttr(est.client_name)}','${escAttr(est.client_email||'')}')" title="View client">${esc(est.client_name)}</div><div class="invoice-num">${esc(est.client_email)}</div></td>
         <td>${esc(est.estimate_number)}</td>
-        <td><code style="font-size:13px;letter-spacing:0.1em;background:var(--gray-100);padding:2px 6px;border-radius:4px;">${esc(est.passcode || '—')}</code></td>
+        <td onclick="event.stopPropagation();copyCode('${escAttr(est.passcode||'')}',this)" title="Click to copy" style="cursor:pointer;"><code style="font-size:13px;letter-spacing:0.1em;background:var(--gray-100);padding:2px 6px;border-radius:4px;">${esc(est.passcode || '—')}</code></td>
         <td>${formatDate(est.created_at)}</td>
         <td>${completion}</td>
         <td class="amount">$${Number(est.total).toFixed(2)}</td>
@@ -1361,6 +1867,7 @@ async function submitEstimate(e) {
     sendSmsNotification: document.getElementById('est-send-sms').checked,
     receiptPhotos,
     depositAmount: parseFloat(document.getElementById('est-deposit').value) || null,
+    ...getEstSchedData(),
   };
 
   if (document.getElementById('est-save-client-check').checked) {
@@ -1395,6 +1902,7 @@ async function submitEstimate(e) {
 
 function resetEstimateForm() {
   currentEditEstimateId = null;
+  setEstSchedMode('off');
   document.getElementById('estimate-form').reset();
   document.getElementById('est-items-tbody').innerHTML = '';
   estItemId = 0;
@@ -2388,4 +2896,306 @@ function _buildEstimatesChart() {
       responsive: true, maintainAspectRatio: true,
     }
   });
+}
+
+// ─── Scheduling ────────────────────────────────────────────────────────────────
+
+let estSchedMode = 'off';
+
+function setEstSchedMode(mode) {
+  estSchedMode = mode;
+  ['off', 'manager', 'client'].forEach(m => {
+    document.getElementById(`est-sched-${m}-btn`)?.classList.toggle('sched-mode-active', m === mode);
+  });
+  document.getElementById('est-sched-manager-fields').style.display = mode === 'manager' ? '' : 'none';
+  document.getElementById('est-sched-client-msg').style.display = mode === 'client' ? '' : 'none';
+}
+
+function getEstSchedData() {
+  if (estSchedMode === 'off') return {};
+  if (estSchedMode === 'manager') {
+    const date = document.getElementById('est-sched-date').value;
+    const time = document.getElementById('est-sched-time').value;
+    const duration = parseInt(document.getElementById('est-sched-duration').value) || 60;
+    if (!date || !time) return { schedulingMode: 'manager' };
+    return {
+      schedulingMode: 'manager',
+      scheduledAt: new Date(`${date}T${time}`).toISOString(),
+      scheduledDuration: duration,
+    };
+  }
+  if (estSchedMode === 'client') return { schedulingMode: 'client' };
+  return {};
+}
+
+function getInvSchedData() {
+  const date = document.getElementById('inv-sched-date').value;
+  const time = document.getElementById('inv-sched-time').value;
+  const duration = parseInt(document.getElementById('inv-sched-duration').value) || 60;
+  if (!date || !time) return {};
+  return {
+    scheduledAt: new Date(`${date}T${time}`).toISOString(),
+    scheduledDuration: duration,
+  };
+}
+
+// ─── Google Calendar settings ──────────────────────────────────────────────────
+
+const DAYS = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+const HOUR_OPTIONS = [
+  [5,'5:00 AM'],[6,'6:00 AM'],[7,'7:00 AM'],[8,'8:00 AM'],[9,'9:00 AM'],
+  [10,'10:00 AM'],[11,'11:00 AM'],[12,'12:00 PM'],[13,'1:00 PM'],[14,'2:00 PM'],
+  [15,'3:00 PM'],[16,'4:00 PM'],[17,'5:00 PM'],[18,'6:00 PM'],[19,'7:00 PM'],[20,'8:00 PM'],
+];
+
+function buildHourSelect(id, selected) {
+  return `<select id="${id}" class="wh-select">${HOUR_OPTIONS.map(([v,l]) => `<option value="${v}"${v==selected?' selected':''}>${l}</option>`).join('')}</select>`;
+}
+
+function renderWorkHoursGrid(perDay) {
+  const grid = document.getElementById('work-hours-grid');
+  if (!grid) return;
+  const defaultPerDay = { '0':null,'1':{start:8,end:17},'2':{start:8,end:17},'3':{start:8,end:17},'4':{start:8,end:17},'5':{start:8,end:17},'6':null };
+  const config = perDay || defaultPerDay;
+  grid.innerHTML = DAYS.map((day, i) => {
+    const dayCfg = config[String(i)];
+    const enabled = dayCfg !== null && dayCfg !== undefined;
+    const s = dayCfg?.start ?? 8;
+    const e = dayCfg?.end ?? 17;
+    return `
+      <div class="wh-row" id="wh-row-${i}">
+        <label class="wh-day-toggle">
+          <input type="checkbox" id="wh-enabled-${i}" ${enabled?'checked':''} onchange="toggleWorkDay(${i})">
+          <span class="wh-day-name">${day.slice(0,3)}</span>
+        </label>
+        <div class="wh-hours-inputs" id="wh-hours-${i}" style="${enabled?'':'opacity:0.35;pointer-events:none;'}">
+          ${buildHourSelect('wh-start-'+i, s)}
+          <span class="wh-to">to</span>
+          ${buildHourSelect('wh-end-'+i, e)}
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function toggleWorkDay(dayIdx) {
+  const enabled = document.getElementById(`wh-enabled-${dayIdx}`).checked;
+  const hoursEl = document.getElementById(`wh-hours-${dayIdx}`);
+  hoursEl.style.opacity = enabled ? '' : '0.35';
+  hoursEl.style.pointerEvents = enabled ? '' : 'none';
+}
+
+async function loadGcalStatus() {
+  try {
+    const res = await fetch('/api/get-business-profile');
+    if (!res.ok) return;
+    const profile = await res.json();
+    const connected = !!profile.gcal_refresh_token;
+    document.getElementById('gcal-connected-msg').style.display = connected ? '' : 'none';
+    document.getElementById('gcal-connect-btn').textContent = connected ? 'Reconnect Google Calendar' : 'Connect Google Calendar';
+    document.getElementById('gcal-disconnect-btn').style.display = connected ? '' : 'none';
+    document.getElementById('gcal-hours-wrap').style.display = connected ? '' : 'none';
+    if (connected) {
+      renderWorkHoursGrid(profile.work_hours_per_day || null);
+    }
+  } catch {}
+}
+
+function connectGoogleCalendar() {
+  window.location.href = '/.netlify/functions/google-oauth';
+}
+
+async function disconnectGoogleCalendar() {
+  if (!confirm('Disconnect Google Calendar? Existing calendar events will not be deleted.')) return;
+  try {
+    await fetch('/api/save-gcal-settings', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ gcal_refresh_token: null }),
+    });
+    loadGcalStatus();
+    showToast('Google Calendar disconnected.', 'success');
+  } catch { showToast('Failed to disconnect.', 'error'); }
+}
+
+async function saveWorkHoursPerDay() {
+  const perDay = {};
+  let valid = true;
+  for (let i = 0; i < 7; i++) {
+    const enabled = document.getElementById(`wh-enabled-${i}`)?.checked;
+    if (!enabled) { perDay[String(i)] = null; continue; }
+    const start = parseInt(document.getElementById(`wh-start-${i}`).value);
+    const end = parseInt(document.getElementById(`wh-end-${i}`).value);
+    if (start >= end) { showToast(`${DAYS[i]}: end time must be after start.`, 'error'); valid = false; break; }
+    perDay[String(i)] = { start, end };
+  }
+  if (!valid) return;
+  try {
+    await fetch('/api/save-gcal-settings', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ work_hours_per_day: perDay }),
+    });
+    const saved = document.getElementById('gcal-hours-saved');
+    saved.style.display = '';
+    setTimeout(() => { saved.style.display = 'none'; }, 2000);
+  } catch { showToast('Failed to save hours.', 'error'); }
+}
+
+// Legacy — kept for backward compatibility
+async function saveWorkHours() { return saveWorkHoursPerDay(); }
+
+// Handle ?gcal= URL param after OAuth redirect
+(function handleGcalRedirect() {
+  const params = new URLSearchParams(window.location.search);
+  const gcal = params.get('gcal');
+  if (!gcal) return;
+  // Clean the URL
+  window.history.replaceState({}, '', window.location.pathname);
+  // Show message once settings tab loads
+  window._gcalRedirect = gcal;
+})();
+
+function handleGcalRedirect() {
+  if (!window._gcalRedirect) return;
+  const errEl = document.getElementById('gcal-error-msg');
+  const okEl = document.getElementById('gcal-connected-msg');
+  if (window._gcalRedirect === 'connected') {
+    if (okEl) okEl.style.display = '';
+    showToast('Google Calendar connected!', 'success');
+  } else if (window._gcalRedirect === 'reauth') {
+    if (errEl) { errEl.textContent = 'No refresh token received. Please revoke InvoiceMePro access at myaccount.google.com/permissions, then try connecting again.'; errEl.style.display = ''; }
+  } else {
+    if (errEl) { errEl.textContent = 'Google Calendar connection failed. Please try again.'; errEl.style.display = ''; }
+  }
+  delete window._gcalRedirect;
+}
+
+// Auto-navigate to settings tab after gcal OAuth redirect
+document.addEventListener('DOMContentLoaded', () => {
+  if (window._gcalRedirect && sessionStorage.getItem('mgr_auth') === '1') {
+    setTimeout(() => showTab('settings'), 100);
+  }
+});
+
+// ─── Inline Schedule Event Modal ──────────────────────────────────────────────
+
+let _smServiceCall = null;
+
+function openSchedModal(client) {
+  // Reset form
+  ['sm-client-name','sm-client-email','sm-client-phone','sm-notes'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.value = '';
+  });
+  document.getElementById('sm-date').value = new Date().toISOString().split('T')[0];
+  document.getElementById('sm-time').value = '';
+  document.getElementById('sm-duration').value = '60';
+  document.getElementById('sm-error').style.display = 'none';
+  document.getElementById('sm-suggestions').style.display = 'none';
+  document.getElementById('sm-notify-email').checked = true;
+  document.getElementById('sm-notify-sms').checked = true;
+  smClearSC();
+  _smServiceCall = null;
+
+  // Pre-fill client if provided
+  if (client) {
+    document.getElementById('sm-client-name').value = client.name || '';
+    document.getElementById('sm-client-email').value = client.email || '';
+    if (client.phone) {
+      const digits = client.phone.replace(/\D/g, '');
+      document.getElementById('sm-client-phone').value = digits.length > 10 ? digits.slice(-10) : digits;
+    }
+  }
+
+  const overlay = document.getElementById('sched-modal-overlay');
+  overlay.style.display = 'flex'; // overrides the initial display:none
+  setTimeout(() => document.getElementById('sm-client-name').focus(), 100);
+}
+
+function closeSchedModal() {
+  document.getElementById('sched-modal-overlay').style.display = 'none';
+}
+
+function smClientSearch(val) {
+  const el = document.getElementById('sm-suggestions');
+  if (!val.trim() || val.length < 2) { el.style.display = 'none'; return; }
+  const matches = clientsCache.filter(c => c.name.toLowerCase().includes(val.toLowerCase())).slice(0, 5);
+  if (!matches.length) { el.style.display = 'none'; return; }
+  el.innerHTML = matches.map(c => `
+    <div onclick="smSelectClient(${JSON.stringify(c).replace(/"/g,'&quot;')})"
+      style="padding:10px 14px;cursor:pointer;border-bottom:1px solid var(--gray-100);"
+      onmouseenter="this.style.background='#f9fafb'" onmouseleave="this.style.background=''">
+      <div style="font-size:14px;font-weight:600;color:var(--gray-900);">${esc(c.name)}</div>
+      <div style="font-size:12px;color:var(--gray-400);">${esc(c.email)}${c.phone ? ' · '+esc(c.phone) : ''}</div>
+    </div>`).join('');
+  el.style.display = '';
+}
+
+function smSelectClient(c) {
+  document.getElementById('sm-client-name').value = c.name;
+  document.getElementById('sm-client-email').value = c.email || '';
+  if (c.phone) {
+    const digits = c.phone.replace(/\D/g,'');
+    document.getElementById('sm-client-phone').value = digits.length > 10 ? digits.slice(-10) : digits;
+  }
+  document.getElementById('sm-suggestions').style.display = 'none';
+}
+
+function smSelectSC(btn, amount) {
+  document.querySelectorAll('.sched-sc-btn').forEach(b => b.classList.remove('sched-sc-active'));
+  btn.classList.add('sched-sc-active');
+  _smServiceCall = { amount, description: 'Service Call' };
+  document.getElementById('sm-sc-display').textContent = `Service Call — $${amount}.00`;
+  document.getElementById('sm-sc-display').style.display = '';
+  document.getElementById('sm-sc-clear').style.display = '';
+}
+
+function smClearSC() {
+  _smServiceCall = null;
+  document.querySelectorAll('.sched-sc-btn').forEach(b => b.classList.remove('sched-sc-active'));
+  const disp = document.getElementById('sm-sc-display');
+  if (disp) disp.style.display = 'none';
+  const clr = document.getElementById('sm-sc-clear');
+  if (clr) clr.style.display = 'none';
+}
+
+async function submitSchedModal() {
+  const clientName  = document.getElementById('sm-client-name').value.trim();
+  const clientEmail = document.getElementById('sm-client-email').value.trim();
+  const rawPhone    = document.getElementById('sm-client-phone').value.trim();
+  const clientPhone = rawPhone ? '+1' + rawPhone.replace(/\D/g,'') : '';
+  const date        = document.getElementById('sm-date').value;
+  const time        = document.getElementById('sm-time').value;
+  const durationMins = parseInt(document.getElementById('sm-duration').value) || 60;
+  const notes       = document.getElementById('sm-notes').value.trim();
+  const notifyEmail = document.getElementById('sm-notify-email').checked;
+  const notifySms   = document.getElementById('sm-notify-sms').checked;
+  const errEl       = document.getElementById('sm-error');
+  errEl.style.display = 'none';
+
+  if (!clientName)  { errEl.textContent = 'Client name is required.';  errEl.style.display = ''; return; }
+  if (!clientEmail) { errEl.textContent = 'Client email is required.'; errEl.style.display = ''; return; }
+  if (!date || !time) { errEl.textContent = 'Date and time are required.'; errEl.style.display = ''; return; }
+
+  const scheduledAt = new Date(`${date}T${time}`).toISOString();
+  const btn = document.getElementById('sm-submit-btn');
+  btn.disabled = true; btn.textContent = 'Scheduling...';
+
+  try {
+    const res = await fetch('/api/create-scheduled-event', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        clientName, clientEmail, clientPhone, scheduledAt, durationMins,
+        serviceCall: _smServiceCall || null,
+        notes: notes || null,
+        sendNotifications: notifyEmail || notifySms,
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) { errEl.textContent = data.error || 'Failed to create event.'; errEl.style.display = ''; return; }
+    closeSchedModal();
+    showToast('Event scheduled!', 'success');
+    loadSchedule();
+  } catch {
+    errEl.textContent = 'Network error. Please try again.'; errEl.style.display = '';
+  } finally {
+    btn.disabled = false; btn.textContent = 'Schedule Event';
+  }
 }
