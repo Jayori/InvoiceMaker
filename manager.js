@@ -929,7 +929,7 @@ async function loadEstimates() {
             <button class="btn btn-sm btn-secondary" onclick="editEstimate('${est.id}')">Edit</button>
             <button class="btn btn-sm" style="background:#fee2e2;color:#dc2626;border:none;" onclick="deleteEstimate('${est.id}')">Delete</button>
             ${est.status === 'approved' ? `<button class="btn btn-sm btn-primary" onclick="openEstimateDetail('${est.id}')" title="Convert to invoice" style="background:#0f766e;">Invoice →</button>` : ''}
-            <button class="btn btn-sm btn-secondary" onclick="saveClientFromRow('${escAttr(est.client_name)}','${escAttr(est.client_email)}','${escAttr(est.client_phone||'')}','${escAttr(est.client_company||'')}','${escAttr(est.client_address||'')}','${escAttr(est.client_city||'')}','${escAttr(est.client_state||'')}','${escAttr(est.client_zip||'')}')" title="Save client to contacts">+ Client</button>
+            ${!clientsCache.some(c => c.email?.toLowerCase() === est.client_email?.toLowerCase()) ? `<button class="btn btn-sm btn-secondary" onclick="saveClientFromRow('${escAttr(est.client_name)}','${escAttr(est.client_email)}','${escAttr(est.client_phone||'')}','${escAttr(est.client_company||'')}','${escAttr(est.client_address||'')}','${escAttr(est.client_city||'')}','${escAttr(est.client_state||'')}','${escAttr(est.client_zip||'')}')" title="Save client to contacts">+ Client</button>` : ''}
           </div>
         </td>
       </tr>`;
