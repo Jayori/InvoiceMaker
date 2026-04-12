@@ -220,7 +220,7 @@ async function loadInvoices() {
       <tr onclick="previewInvoice('${inv.id}')" style="cursor:pointer;" title="Click to preview">
         <td><div class="client-name">${esc(inv.client_name)}</div><div class="invoice-num">${esc(inv.client_email)}</div></td>
         <td>${esc(inv.invoice_number)}</td>
-        <td><code style="font-size:13px;letter-spacing:0.1em;background:var(--gray-100);padding:2px 6px;border-radius:4px;">${esc(inv.passcode || '—')}</code></td>
+        <td onclick="event.stopPropagation()"><code style="cursor:pointer;font-size:13px;letter-spacing:0.1em;background:var(--gray-100);padding:2px 6px;border-radius:4px;" onclick="copyPasscode('${escAttr(inv.passcode||'')}',this)" title="Click to copy">${esc(inv.passcode || '—')}</code></td>
         <td>${formatDate(inv.created_at)}</td>
         <td>${inv.due_date ? formatDate(inv.due_date) : '—'}</td>
         <td class="amount">$${Number(inv.total).toFixed(2)}</td>
@@ -231,7 +231,7 @@ async function loadInvoices() {
             ${inv.status !== 'paid' ? `<button class="btn btn-sm" style="background:#dcfce7;color:#166534;border:none;" onclick="markInvoicePaidFromRow('${inv.id}')">Mark Paid</button>` : ''}
             <button class="btn btn-sm btn-secondary" onclick="editInvoice('${inv.id}')">Edit</button>
             <button class="btn btn-sm" style="background:#fee2e2;color:#dc2626;border:none;" onclick="deleteInvoice('${inv.id}')">Delete</button>
-            <button class="btn btn-sm btn-secondary" onclick="saveClientFromRow('${escAttr(inv.client_name)}','${escAttr(inv.client_email)}','${escAttr(inv.client_phone||'')}','${escAttr(inv.client_company||'')}','${escAttr(inv.client_address||'')}','${escAttr(inv.client_city||'')}','${escAttr(inv.client_state||'')}','${escAttr(inv.client_zip||'')}')" title="Save client to contacts">+ Client</button>
+            ${!clientsCache.some(c => c.email?.toLowerCase() === inv.client_email?.toLowerCase()) ? `<button class="btn btn-sm btn-secondary" onclick="saveClientFromRow('${escAttr(inv.client_name)}','${escAttr(inv.client_email)}','${escAttr(inv.client_phone||'')}','${escAttr(inv.client_company||'')}','${escAttr(inv.client_address||'')}','${escAttr(inv.client_city||'')}','${escAttr(inv.client_state||'')}','${escAttr(inv.client_zip||'')}')" title="Save client to contacts">+ Client</button>` : ''}
           </div>
         </td>
       </tr>`).join('');
@@ -1981,6 +1981,20 @@ function quickEstServiceCall(price, mode = 'new') {
 
 let _currentPreviewId = null;
 let _currentPreviewType = 'invoice'; // 'invoice' or 'estimate'
+
+function copyPasscode(code, el) {
+  if (!code) return;
+  navigator.clipboard.writeText(code).catch(() => {
+    const ta = document.createElement('textarea');
+    ta.value = code; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select(); document.execCommand('copy');
+    document.body.removeChild(ta);
+  });
+  const orig = el.textContent;
+  el.textContent = 'Copied!';
+  el.style.background = '#dcfce7'; el.style.color = '#166534';
+  setTimeout(() => { el.textContent = orig; el.style.background = ''; el.style.color = ''; }, 1500);
+}
 
 function copyPaymentLink(url) {
   if (!url) { showToast('No payment link available.', 'error'); return; }
