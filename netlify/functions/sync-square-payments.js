@@ -12,24 +12,15 @@ exports.handler = async (event) => {
 
   try {
     // Fetch completed payments from Square (last 180 days)
+    // square.payments.list() in SDK v41 returns an async iterable Page object
     const beginTime = new Date(Date.now() - 180 * 24 * 60 * 60 * 1000).toISOString();
-    let cursor = undefined;
     const completedPayments = [];
 
-    // Paginate through Square payments
-    do {
-      const result = await square.payments.list({
-        beginTime,
-        sortOrder: 'DESC',
-        cursor,
-        limit: 100,
-      });
-      const payments = result.payments || [];
-      completedPayments.push(...payments.filter(p => p.status === 'COMPLETED'));
-      cursor = result.cursor;
-      // Stop after 500 payments to avoid long running function
+    const iter = await square.payments.list({ beginTime, sortOrder: 'DESC', limit: 100 });
+    for await (const p of iter) {
+      if (p.status === 'COMPLETED') completedPayments.push(p);
       if (completedPayments.length >= 500) break;
-    } while (cursor);
+    }
 
     if (!completedPayments.length) {
       return {
