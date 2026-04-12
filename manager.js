@@ -70,6 +70,7 @@ function showTab(name, link) {
   if (name === 'dashboard') { loadInvoices(); loadEstimates(); }
   if (name === 'clients') loadClients();
   if (name === 'settings') loadBusinessProfiles();
+  if (name === 'analytics') buildAnalytics();
 }
 
 // ─── Business profiles ────────────────────────────────────────────────────────
@@ -236,6 +237,7 @@ async function loadInvoices() {
         </td>
       </tr>`).join('');
     table.style.display = '';
+    buildMiniWidget();
   } catch { loading.textContent = 'Failed to load invoices.'; }
 }
 
@@ -2134,4 +2136,242 @@ function printReceipt() {
   <script>window.onload = function(){ window.print(); }<\/script>
   </body></html>`);
   win.document.close();
+}
+
+// ─── Analytics ─────────────────────────────────────────────────────────────────
+
+const _chartInstances = {};
+let _revenueRange = 12;
+
+function _destroyChart(id) {
+  if (_chartInstances[id]) { _chartInstances[id].destroy(); delete _chartInstances[id]; }
+}
+
+function _fmt$(n) {
+  return '$' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+}
+
+function buildMiniWidget() {
+  const paid = invoicesCache.filter(i => i.status === 'paid');
+  const now = new Date();
+  const paidThisMonth = paid.filter(i => {
+    const d = new Date(i.paid_at || i.created_at);
+    return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+  });
+  const paidThisYear = paid.filter(i => new Date(i.paid_at || i.created_at).getFullYear() === now.getFullYear());
+  const outstanding = invoicesCache.filter(i => i.status === 'pending').reduce((s, i) => s + Number(i.total), 0);
+
+  const setEl = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+  setEl('mini-stat-month', _fmt$(paidThisMonth.reduce((s, i) => s + Number(i.total), 0)));
+  setEl('mini-stat-year', _fmt$(paidThisYear.reduce((s, i) => s + Number(i.total), 0)));
+  setEl('mini-stat-outstanding', _fmt$(outstanding));
+
+  const canvas = document.getElementById('mini-revenue-chart');
+  if (!canvas || typeof Chart === 'undefined') return;
+  const labels = [], data = [];
+  for (let m = 5; m >= 0; m--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - m, 1);
+    labels.push(d.toLocaleString('default', { month: 'short' }));
+    data.push(paid.filter(i => {
+      const p = new Date(i.paid_at || i.created_at);
+      return p.getFullYear() === d.getFullYear() && p.getMonth() === d.getMonth();
+    }).reduce((s, i) => s + Number(i.total), 0));
+  }
+  _destroyChart('mini');
+  _chartInstances['mini'] = new Chart(canvas, {
+    type: 'bar',
+    data: { labels, datasets: [{ data, backgroundColor: '#bfdbfe', borderRadius: 4 }] },
+    options: {
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => _fmt$(ctx.raw) } } },
+      scales: { x: { grid: { display: false }, ticks: { font: { size: 10 } } }, y: { display: false } },
+      responsive: true, maintainAspectRatio: true,
+    }
+  });
+}
+
+function buildAnalytics() {
+  if (typeof Chart === 'undefined') return;
+  const paid = invoicesCache.filter(i => i.status === 'paid');
+  const pending = invoicesCache.filter(i => i.status === 'pending');
+  const now = new Date();
+  const yr = now.getFullYear(), mo = now.getMonth();
+  const q = Math.floor(mo / 3);
+  const sum = arr => arr.reduce((s, i) => s + Number(i.total), 0);
+
+  const paidMo = paid.filter(i => { const d = new Date(i.paid_at || i.created_at); return d.getFullYear() === yr && d.getMonth() === mo; });
+  const paidQ  = paid.filter(i => { const d = new Date(i.paid_at || i.created_at); return d.getFullYear() === yr && Math.floor(d.getMonth()/3) === q; });
+  const paidYr = paid.filter(i => new Date(i.paid_at || i.created_at).getFullYear() === yr);
+
+  const setEl = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+  setEl('stat-this-month',   _fmt$(sum(paidMo)));
+  setEl('stat-this-quarter', _fmt$(sum(paidQ)));
+  setEl('stat-this-year',    _fmt$(sum(paidYr)));
+  setEl('stat-all-time',     _fmt$(sum(paid)));
+  setEl('stat-outstanding',  _fmt$(sum(pending)));
+  setEl('stat-avg-invoice',  paid.length ? _fmt$(sum(paid) / paid.length) : '$0');
+
+  const keyEl = document.getElementById('analytics-key-stats');
+  if (keyEl) {
+    const clientMap = {};
+    paid.forEach(i => { clientMap[i.client_name] = (clientMap[i.client_name] || 0) + Number(i.total); });
+    const topClient = Object.entries(clientMap).sort((a,b) => b[1]-a[1])[0];
+    const monthMap = {};
+    paid.forEach(i => {
+      const d = new Date(i.paid_at || i.created_at);
+      const key = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
+      monthMap[key] = (monthMap[key] || 0) + Number(i.total);
+    });
+    const topMonth = Object.entries(monthMap).sort((a,b) => b[1]-a[1])[0];
+    const topMonthLabel = topMonth ? (() => {
+      const parts = topMonth[0].split('-');
+      return new Date(parts[0], parseInt(parts[1])-1, 1).toLocaleString('default',{month:'long',year:'numeric'});
+    })() : '—';
+    const collRate = invoicesCache.length ? Math.round(paid.length/invoicesCache.length*100) : 0;
+    const estTotal = estimatesCache.length;
+    const estApproved = estimatesCache.filter(e => e.status === 'approved').length;
+    const convRate = estTotal ? Math.round(estApproved/estTotal*100) : 0;
+
+    keyEl.innerHTML = [
+      ['Best Client',          topClient ? topClient[0] + ' (' + _fmt$(topClient[1]) + ')' : '—'],
+      ['Highest Invoice',      paid.length ? _fmt$(Math.max(...paid.map(i => Number(i.total)))) : '—'],
+      ['Best Month',           topMonth ? topMonthLabel + ' — ' + _fmt$(topMonth[1]) : '—'],
+      ['Collection Rate',      collRate + '% of invoices paid'],
+      ['Estimate Close Rate',  convRate + '% (' + estApproved + ' / ' + estTotal + ' approved)'],
+      ['Total Invoices Sent',  invoicesCache.length],
+      ['Total Estimates Sent', estTotal],
+    ].map(function(row) {
+      return '<div style="display:flex;justify-content:space-between;align-items:baseline;padding:9px 0;border-bottom:1px solid var(--gray-100);">' +
+        '<span style="font-size:12px;color:var(--gray-500);">' + row[0] + '</span>' +
+        '<span style="font-size:13px;font-weight:600;color:#111827;text-align:right;max-width:58%;">' + row[1] + '</span>' +
+        '</div>';
+    }).join('');
+  }
+
+  _buildLineChart();
+  _buildBarChart(yr, paid);
+  _buildDonutChart(paid, pending);
+  _buildClientsChart(paid);
+  _buildEstimatesChart();
+}
+
+function setRevenueRange(months) {
+  _revenueRange = months;
+  [6,12,24].forEach(function(n) {
+    const btn = document.getElementById('range-' + n);
+    if (btn) btn.className = n === months ? 'btn btn-sm' : 'btn btn-sm btn-secondary';
+  });
+  _buildLineChart();
+}
+
+function _buildLineChart() {
+  const paid = invoicesCache.filter(i => i.status === 'paid');
+  const now = new Date();
+  const labels = [], data = [];
+  for (let m = _revenueRange - 1; m >= 0; m--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - m, 1);
+    const showYear = _revenueRange > 12;
+    labels.push(d.toLocaleString('default', showYear ? { month: 'short', year: '2-digit' } : { month: 'short' }));
+    data.push(paid.filter(i => {
+      const p = new Date(i.paid_at || i.created_at);
+      return p.getFullYear() === d.getFullYear() && p.getMonth() === d.getMonth();
+    }).reduce((s, i) => s + Number(i.total), 0));
+  }
+  _destroyChart('line');
+  const canvas = document.getElementById('analytics-line-chart');
+  if (!canvas) return;
+  _chartInstances['line'] = new Chart(canvas, {
+    type: 'line',
+    data: { labels, datasets: [{ label: 'Revenue', data, borderColor: '#1a56db', backgroundColor: 'rgba(26,86,219,0.08)', fill: true, tension: 0.4, pointBackgroundColor: '#1a56db', pointRadius: 4 }] },
+    options: {
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => _fmt$(ctx.raw) } } },
+      scales: { x: { grid: { display: false } }, y: { ticks: { callback: v => '$' + v.toLocaleString() }, grid: { color: '#f3f4f6' } } },
+      responsive: true, maintainAspectRatio: true,
+    }
+  });
+}
+
+function _buildBarChart(year, paid) {
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const now = new Date();
+  const data = months.map(function(_, m) {
+    if (year === now.getFullYear() && m > now.getMonth()) return 0;
+    return paid.filter(i => { const d = new Date(i.paid_at || i.created_at); return d.getFullYear() === year && d.getMonth() === m; }).reduce((s,i) => s + Number(i.total), 0);
+  });
+  const colors = months.map(function(_, m) {
+    if (year === now.getFullYear() && m === now.getMonth()) return '#1a56db';
+    if (year === now.getFullYear() && m > now.getMonth()) return '#e5e7eb';
+    return '#93c5fd';
+  });
+  _destroyChart('bar');
+  const canvas = document.getElementById('analytics-bar-chart');
+  if (!canvas) return;
+  _chartInstances['bar'] = new Chart(canvas, {
+    type: 'bar',
+    data: { labels: months, datasets: [{ label: 'Revenue', data, backgroundColor: colors, borderRadius: 4 }] },
+    options: {
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => _fmt$(ctx.raw) } } },
+      scales: { x: { grid: { display: false } }, y: { ticks: { callback: v => '$' + v.toLocaleString() }, grid: { color: '#f3f4f6' } } },
+      responsive: true, maintainAspectRatio: true,
+    }
+  });
+}
+
+function _buildDonutChart(paid, pending) {
+  const overdue = pending.filter(i => i.due_date && new Date(i.due_date) < new Date());
+  const pendingClean = pending.length - overdue.length;
+  _destroyChart('donut');
+  const canvas = document.getElementById('analytics-donut-chart');
+  if (!canvas) return;
+  _chartInstances['donut'] = new Chart(canvas, {
+    type: 'doughnut',
+    data: {
+      labels: ['Paid', 'Pending', 'Overdue'],
+      datasets: [{ data: [paid.length, pendingClean, overdue.length], backgroundColor: ['#86efac','#fde68a','#fca5a5'], borderColor: ['#22c55e','#f59e0b','#ef4444'], borderWidth: 2 }]
+    },
+    options: { plugins: { legend: { position: 'bottom', labels: { font: { size: 12 }, padding: 14 } } }, responsive: true, maintainAspectRatio: true }
+  });
+  const legendEl = document.getElementById('donut-legend');
+  if (legendEl) legendEl.innerHTML = [['Paid',paid.length,'#22c55e'],['Pending',pendingClean,'#f59e0b'],['Overdue',overdue.length,'#ef4444']]
+    .map(function(row) { return '<div style="display:flex;justify-content:space-between;padding:3px 0;"><span style="color:' + row[2] + ';font-weight:600;">' + row[0] + '</span><span style="color:#374151;">' + row[1] + ' invoice' + (row[1]!==1?'s':'') + '</span></div>'; }).join('');
+}
+
+function _buildClientsChart(paid) {
+  const map = {};
+  paid.forEach(i => { map[i.client_name] = (map[i.client_name] || 0) + Number(i.total); });
+  const sorted = Object.entries(map).sort((a,b) => b[1]-a[1]).slice(0, 8);
+  _destroyChart('clients');
+  const canvas = document.getElementById('analytics-clients-chart');
+  if (!canvas) return;
+  _chartInstances['clients'] = new Chart(canvas, {
+    type: 'bar',
+    data: { labels: sorted.map(r => r[0]), datasets: [{ label: 'Revenue', data: sorted.map(r => r[1]), backgroundColor: '#bfdbfe', borderColor: '#1a56db', borderWidth: 1, borderRadius: 4 }] },
+    options: {
+      indexAxis: 'y',
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => _fmt$(ctx.raw) } } },
+      scales: { x: { ticks: { callback: v => '$'+v.toLocaleString() }, grid: { color: '#f3f4f6' } }, y: { grid: { display: false } } },
+      responsive: true, maintainAspectRatio: false,
+    }
+  });
+}
+
+function _buildEstimatesChart() {
+  const total = estimatesCache.length;
+  const approved = estimatesCache.filter(e => e.status === 'approved').length;
+  const pendingEst = estimatesCache.filter(e => e.status === 'pending').length;
+  const rejected = estimatesCache.filter(e => e.status === 'rejected').length;
+  _destroyChart('estimates');
+  const canvas = document.getElementById('analytics-estimates-chart');
+  if (!canvas) return;
+  _chartInstances['estimates'] = new Chart(canvas, {
+    type: 'bar',
+    data: {
+      labels: ['Total Sent', 'Approved', 'Pending', 'Rejected'],
+      datasets: [{ data: [total, approved, pendingEst, rejected], backgroundColor: ['#bfdbfe','#86efac','#fde68a','#fca5a5'], borderRadius: 4 }]
+    },
+    options: {
+      plugins: { legend: { display: false } },
+      scales: { x: { grid: { display: false } }, y: { ticks: { stepSize: 1 }, grid: { color: '#f3f4f6' } } },
+      responsive: true, maintainAspectRatio: true,
+    }
+  });
 }

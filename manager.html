@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Manager — Invoice Pro</title>
   <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
 <body class="manager-body">
 
@@ -47,6 +48,10 @@
             <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
             <span>Clients</span>
           </a>
+          <a href="#" class="mgr-nav-item" onclick="showTab('analytics',this)">
+            <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 8v8m-4-5v5m-4-2v2m-2 4h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+            <span>Analytics</span>
+          </a>
           <a href="#" class="mgr-nav-item" onclick="showTab('settings',this)">
             <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
             <span>Settings</span>
@@ -73,6 +78,10 @@
           <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
           <span>Clients</span>
         </a>
+        <a href="#" class="mobile-nav-item" onclick="showTab('analytics',this)">
+          <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 8v8m-4-5v5m-4-2v2m-2 4h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+          <span>Analytics</span>
+        </a>
         <a href="#" class="mobile-nav-item" onclick="showTab('settings',this)">
           <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
           <span>Settings</span>
@@ -96,6 +105,8 @@
             </div>
           </div>
 
+          <div style="display:flex;gap:24px;align-items:flex-start;">
+          <div style="flex:1;min-width:0;">
           <div class="invoice-table-wrap">
             <div id="dash-loading" style="padding:40px;text-align:center;color:var(--gray-400);">Loading...</div>
             <table class="invoice-table" id="invoice-table" style="display:none;">
@@ -200,6 +211,113 @@
                   <div id="deposit-result" style="margin-top:12px;font-size:14px;"></div>
                 </div>
               </div>
+            </div>
+          </div>
+          </div><!-- /left col -->
+
+          <!-- Mini Analytics Panel -->
+          <div id="mini-analytics-panel" style="width:272px;flex-shrink:0;">
+            <div class="card" style="padding:20px;">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;">
+                <div class="card-title" style="margin:0;font-size:15px;">Overview</div>
+                <a href="#" onclick="showTab('analytics',this);return false;" style="font-size:12px;color:#1a56db;text-decoration:none;font-weight:500;">Full Analytics →</a>
+              </div>
+              <div style="margin-bottom:14px;">
+                <div style="font-size:10px;color:var(--gray-400);text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px;">This Month</div>
+                <div id="mini-stat-month" style="font-size:26px;font-weight:800;color:#111827;">—</div>
+              </div>
+              <div style="margin-bottom:14px;">
+                <div style="font-size:10px;color:var(--gray-400);text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px;">This Year</div>
+                <div id="mini-stat-year" style="font-size:26px;font-weight:800;color:#1a56db;">—</div>
+              </div>
+              <div style="margin-bottom:18px;padding:10px 14px;background:#fef3c7;border-radius:8px;">
+                <div style="font-size:10px;color:#92400e;text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px;">Outstanding</div>
+                <div id="mini-stat-outstanding" style="font-size:20px;font-weight:700;color:#92400e;">—</div>
+              </div>
+              <div style="font-size:10px;color:var(--gray-400);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;">Last 6 Months</div>
+              <canvas id="mini-revenue-chart" height="90"></canvas>
+            </div>
+          </div>
+          </div><!-- /flex wrapper -->
+        </div>
+
+        <!-- Analytics -->
+        <div id="tab-analytics" class="mgr-tab" style="display:none;">
+          <div class="section-header">
+            <h1 class="section-title">Analytics</h1>
+          </div>
+
+          <!-- Stat Cards -->
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(148px,1fr));gap:14px;margin-bottom:24px;">
+            <div class="card" style="padding:16px 18px;">
+              <div style="font-size:10px;color:var(--gray-400);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;">This Month</div>
+              <div id="stat-this-month" style="font-size:24px;font-weight:800;color:#111827;">—</div>
+            </div>
+            <div class="card" style="padding:16px 18px;">
+              <div style="font-size:10px;color:var(--gray-400);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;">This Quarter</div>
+              <div id="stat-this-quarter" style="font-size:24px;font-weight:800;color:#111827;">—</div>
+            </div>
+            <div class="card" style="padding:16px 18px;">
+              <div style="font-size:10px;color:var(--gray-400);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;">This Year</div>
+              <div id="stat-this-year" style="font-size:24px;font-weight:800;color:#1a56db;">—</div>
+            </div>
+            <div class="card" style="padding:16px 18px;">
+              <div style="font-size:10px;color:var(--gray-400);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;">All Time</div>
+              <div id="stat-all-time" style="font-size:24px;font-weight:800;color:#0f766e;">—</div>
+            </div>
+            <div class="card" style="padding:16px 18px;background:#fef3c7;border:none;">
+              <div style="font-size:10px;color:#92400e;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;">Outstanding</div>
+              <div id="stat-outstanding" style="font-size:24px;font-weight:800;color:#92400e;">—</div>
+            </div>
+            <div class="card" style="padding:16px 18px;">
+              <div style="font-size:10px;color:var(--gray-400);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;">Avg Invoice</div>
+              <div id="stat-avg-invoice" style="font-size:24px;font-weight:800;color:#111827;">—</div>
+            </div>
+          </div>
+
+          <!-- Row 1: Line + Bar -->
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px;">
+            <div class="card">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+                <div class="card-title" style="margin:0;">Monthly Revenue</div>
+                <div style="display:flex;gap:5px;">
+                  <button class="btn btn-sm" id="range-6" onclick="setRevenueRange(6)">6mo</button>
+                  <button class="btn btn-sm btn-secondary" id="range-12" onclick="setRevenueRange(12)">12mo</button>
+                  <button class="btn btn-sm btn-secondary" id="range-24" onclick="setRevenueRange(24)">24mo</button>
+                </div>
+              </div>
+              <canvas id="analytics-line-chart"></canvas>
+            </div>
+            <div class="card">
+              <div class="card-title">This Year by Month</div>
+              <canvas id="analytics-bar-chart"></canvas>
+            </div>
+          </div>
+
+          <!-- Row 2: Donut + Top Clients -->
+          <div style="display:grid;grid-template-columns:280px 1fr;gap:20px;margin-bottom:20px;">
+            <div class="card">
+              <div class="card-title">Invoice Status</div>
+              <canvas id="analytics-donut-chart"></canvas>
+              <div id="donut-legend" style="margin-top:12px;font-size:13px;"></div>
+            </div>
+            <div class="card">
+              <div class="card-title">Top Clients by Revenue</div>
+              <div style="position:relative;height:260px;">
+                <canvas id="analytics-clients-chart"></canvas>
+              </div>
+            </div>
+          </div>
+
+          <!-- Row 3: Estimates + Key Stats -->
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:32px;">
+            <div class="card">
+              <div class="card-title">Estimate Pipeline</div>
+              <canvas id="analytics-estimates-chart"></canvas>
+            </div>
+            <div class="card">
+              <div class="card-title">Key Stats</div>
+              <div id="analytics-key-stats"></div>
             </div>
           </div>
         </div>
