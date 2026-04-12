@@ -6,10 +6,13 @@ async function sendSms(phone, message) {
   const key = process.env.TEXTBELT_API_KEY;
   if (!key || !phone) return { success: false, error: 'No API key or phone' };
 
-  // Strip non-digits, add +1 for 10-digit US numbers
-  let cleaned = phone.replace(/[^\d+]/g, '');
-  if (!cleaned.startsWith('+') && cleaned.replace(/\D/g, '').length === 10) cleaned = '+1' + cleaned;
-  if (cleaned.replace(/\D/g, '').length < 10) return { success: false, error: 'Invalid phone number' };
+  // Normalize to E.164 (+1XXXXXXXXXX for US)
+  const digits = phone.replace(/\D/g, '');
+  let cleaned;
+  if (digits.length === 10) cleaned = '+1' + digits;
+  else if (digits.length === 11 && digits.startsWith('1')) cleaned = '+' + digits;
+  else if (digits.length >= 10) cleaned = '+' + digits;
+  else return { success: false, error: 'Invalid phone number' };
 
   try {
     console.log('SMS attempt — phone:', cleaned, 'key prefix:', key.substring(0, 8) + '...');

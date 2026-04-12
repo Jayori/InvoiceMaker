@@ -8,6 +8,16 @@ function buildPhone(ccId, phoneId) {
   return cc + digits;
 }
 
+// Normalize any phone input to E.164 (+1XXXXXXXXXX for US)
+function normalizePhone(raw) {
+  if (!raw) return '';
+  const digits = raw.replace(/\D/g, '');
+  if (digits.length === 10) return '+1' + digits;
+  if (digits.length === 11 && digits.startsWith('1')) return '+' + digits;
+  if (digits.length >= 10) return '+' + digits;
+  return '';
+}
+
 // ─── Auth ─────────────────────────────────────────────────────────────────────
 
 async function verifyPin(e) {
@@ -3160,7 +3170,7 @@ async function submitSchedModal() {
   const clientName  = document.getElementById('sm-client-name').value.trim();
   const clientEmail = document.getElementById('sm-client-email').value.trim();
   const rawPhone    = document.getElementById('sm-client-phone').value.trim();
-  const clientPhone = rawPhone ? '+1' + rawPhone.replace(/\D/g,'') : '';
+  const clientPhone = normalizePhone(rawPhone);
   const date        = document.getElementById('sm-date').value;
   const time        = document.getElementById('sm-time').value;
   const durationMins = parseInt(document.getElementById('sm-duration').value) || 60;

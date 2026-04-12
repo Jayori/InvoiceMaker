@@ -257,8 +257,7 @@ async function submitNewEvent(action) {
   const clientName = document.getElementById('new-client-name').value.trim();
   const clientEmail = document.getElementById('new-client-email').value.trim();
   const rawPhone = document.getElementById('new-client-phone').value.trim();
-  const cc = (document.getElementById('new-cc')?.value || '+1').replace('-CA', '');
-  const clientPhone = rawPhone ? cc + rawPhone.replace(/\D/g, '') : '';
+  const clientPhone = normalizePhone(rawPhone);
   const date = document.getElementById('new-event-date').value;
   const time = document.getElementById('new-event-time').value;
   const durationMins = parseInt(document.getElementById('new-event-duration').value) || 60;
@@ -494,6 +493,16 @@ function overlayClick(e, overlayId) {
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function normalizePhone(raw) {
+  if (!raw) return '';
+  const digits = raw.replace(/\D/g, '');
+  if (digits.length === 10) return '+1' + digits;
+  if (digits.length === 11 && digits.startsWith('1')) return '+' + digits;
+  if (digits.length >= 10) return '+' + digits;
+  return '';
+}
+
 function esc(str) {
   return String(str || '')
     .replace(/&/g, '&amp;').replace(/</g, '&lt;')
