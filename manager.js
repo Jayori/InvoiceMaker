@@ -557,6 +557,8 @@ async function deleteClient(id) {
       body: JSON.stringify({ id }),
     });
     await loadClients();
+    loadInvoices();
+    loadEstimates();
     showToast('Client deleted.', 'success');
   } catch { showToast('Failed to delete.', 'error'); }
 }
