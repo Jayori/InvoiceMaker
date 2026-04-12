@@ -213,7 +213,7 @@ textarea { resize: vertical; min-height: 80px; }
 .mgr-logout { padding: 16px 20px; color: #475569; font-size: 13px; text-decoration: none; border-top: 1px solid rgba(255,255,255,0.08); margin-top: 8px; }
 .mgr-logout:hover { color: #94a3b8; }
 
-.mgr-main { flex: 1; padding: 32px; overflow-y: auto; max-width: 900px; }
+.mgr-main { flex: 1; padding: 32px; overflow-y: auto; min-width: 0; }
 .mgr-tab { }
 
 /* ═══════════════════════════════════════════════════
