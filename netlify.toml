@@ -13,6 +13,9 @@
 [functions]
   node_bundler = "esbuild"
 
+[functions.send-reminders]
+  schedule = "@hourly"
+
 [[redirects]]
   from = "/api/*"
   to = "/.netlify/functions/:splat"

@@ -3014,6 +3014,7 @@ async function loadGcalStatus() {
       renderWorkHoursGrid(profile.work_hours_per_day || null);
     }
     loadSmsTemplates(profile);
+    loadReminderSettings(profile);
   } catch {}
 }
 
@@ -3062,21 +3063,25 @@ async function saveWorkHours() { return saveWorkHoursPerDay(); }
 // ─── SMS Templates ─────────────────────────────────────────────────────────────
 
 const SMS_DEFAULTS = {
-  'invoice_new':      'Invoice from {bizName}: ${amount} due. View & pay at {link} — Code: {passcode}',
-  'invoice_update':   'Updated invoice from {bizName}: ${amount} due. View & pay at {link} — Code: {passcode}',
-  'estimate_new':     'Estimate from {bizName}: ${amount}. View & respond at {link} — Code: {passcode}',
-  'estimate_update':  'Updated estimate from {bizName}: ${amount}. View & respond at {link} — Code: {passcode}',
-  'event_confirm':    '{bizName}: Your appointment is confirmed for {date}.{serviceCall} Questions? Visit {link}',
-  'event_reschedule': '{bizName}: Your appointment has been rescheduled from {oldDate} to {date}. Questions? Call/text us.',
+  'invoice_new':          'Invoice from {bizName}: ${amount} due. View & pay at {link} — Code: {passcode}',
+  'invoice_update':       'Updated invoice from {bizName}: ${amount} due. View & pay at {link} — Code: {passcode}',
+  'estimate_new':         'Estimate from {bizName}: ${amount}. View & respond at {link} — Code: {passcode}',
+  'estimate_update':      'Updated estimate from {bizName}: ${amount}. View & respond at {link} — Code: {passcode}',
+  'event_confirm':        '{bizName}: Your appointment is confirmed for {date}.{serviceCall} Questions? Visit {link}',
+  'event_reschedule':     '{bizName}: Your appointment has been rescheduled from {oldDate} to {date}. Questions? Call/text us.',
+  'event_reminder_24h':   '{bizName}: Reminder — your appointment is tomorrow at {date}.{serviceCall} Questions? Call/text us.',
+  'event_reminder_48h':   '{bizName}: Reminder — your appointment is in 2 days on {date}.{serviceCall} Questions? Call/text us.',
 };
 
 const SMS_FIELD_MAP = {
-  'invoice_new':      'sms-invoice-new',
-  'invoice_update':   'sms-invoice-update',
-  'estimate_new':     'sms-estimate-new',
-  'estimate_update':  'sms-estimate-update',
-  'event_confirm':    'sms-event-confirm',
-  'event_reschedule': 'sms-event-reschedule',
+  'invoice_new':          'sms-invoice-new',
+  'invoice_update':       'sms-invoice-update',
+  'estimate_new':         'sms-estimate-new',
+  'estimate_update':      'sms-estimate-update',
+  'event_confirm':        'sms-event-confirm',
+  'event_reschedule':     'sms-event-reschedule',
+  'event_reminder_24h':   'sms-event-reminder-24h',
+  'event_reminder_48h':   'sms-event-reminder-48h',
 };
 
 function loadSmsTemplates(profile) {
@@ -3109,6 +3114,36 @@ async function saveSmsTemplates() {
     saved.style.display = '';
     setTimeout(() => { saved.style.display = 'none'; }, 2000);
   } catch { showToast('Failed to save templates.', 'error'); }
+}
+
+// ─── Reminder Settings ────────────────────────────────────────────────────────
+
+function loadReminderSettings(profile) {
+  const s = profile?.reminder_settings || {};
+  const set = (id, val) => { const el = document.getElementById(id); if (el) el.checked = !!val; };
+  set('reminder-24h-email', s.h24_email);
+  set('reminder-24h-sms',   s.h24_sms);
+  set('reminder-48h-email', s.h48_email);
+  set('reminder-48h-sms',   s.h48_sms);
+}
+
+async function saveReminderSettings() {
+  const get = id => !!document.getElementById(id)?.checked;
+  const settings = {
+    h24_email: get('reminder-24h-email'),
+    h24_sms:   get('reminder-24h-sms'),
+    h48_email: get('reminder-48h-email'),
+    h48_sms:   get('reminder-48h-sms'),
+  };
+  try {
+    await fetch('/api/save-gcal-settings', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reminder_settings: settings }),
+    });
+    const el = document.getElementById('reminders-saved');
+    el.style.display = '';
+    setTimeout(() => { el.style.display = 'none'; }, 2000);
+  } catch { showToast('Failed to save reminder settings.', 'error'); }
 }
 
 // Handle ?gcal= URL param after OAuth redirect

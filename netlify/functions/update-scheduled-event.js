@@ -86,6 +86,8 @@ exports.handler = async (event) => {
   if (notes !== undefined) update.notes = notes;
   if (serviceCall !== undefined) update.service_call = serviceCall;
   if (status !== undefined) update.status = status;
+  // Reset reminder flags when rescheduled so they fire again for the new time
+  if (isReschedule) { update.reminder_24_sent = false; update.reminder_48_sent = false; }
 
   const { data: updated, error: updateErr } = await supabase
     .from('scheduled_events').update(update).eq('id', id).select().single();

@@ -39,3 +39,13 @@ where id = 1 and work_hours_per_day is null;
 -- SMS templates (customizable per message type)
 alter table business_profile
   add column if not exists sms_templates jsonb default '{}'::jsonb;
+
+-- Reminder settings (which channels to use for 24h/48h reminders)
+alter table business_profile
+  add column if not exists reminder_settings jsonb default '{}'::jsonb;
+
+-- Reminder sent tracking on events (prevents duplicate sends)
+alter table scheduled_events
+  add column if not exists reminder_24_sent boolean default false;
+alter table scheduled_events
+  add column if not exists reminder_48_sent boolean default false;
