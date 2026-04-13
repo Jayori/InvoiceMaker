@@ -2,6 +2,11 @@
   functions = "netlify/functions"
   publish = "."
 
+[dev]
+  port = 8890
+  staticServerPort = 3998
+  functionsPort = 9001
+
 [build.environment]
   SECRETS_SCAN_OMIT_KEYS = "SQUARE_ENVIRONMENT,SQUARE_WEBHOOK_SIGNATURE_KEY"
 

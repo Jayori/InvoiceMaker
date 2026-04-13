@@ -2,6 +2,7 @@ const { Resend } = require('resend');
 const { createClient } = require('@supabase/supabase-js');
 const { sendSms } = require('./send-sms');
 const { updateCalendarEvent } = require('./gcal-client');
+const { getSmsTemplate, renderTemplate } = require('./sms-templates');
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
@@ -131,7 +132,13 @@ exports.handler = async (event) => {
 
     // SMS
     if (existing.client_phone) {
-      const msg = `${bizName}: Your appointment has been rescheduled from ${oldDateStr} to ${newDateStr}. Questions? Call/text us.`;
+      const template = await getSmsTemplate(supabase, 'event_reschedule');
+      const msg = renderTemplate(template, {
+        bizName,
+        clientName: existing.client_name,
+        date: newDateStr,
+        oldDate: oldDateStr,
+      });
       await sendSms(existing.client_phone, msg);
     }
   }

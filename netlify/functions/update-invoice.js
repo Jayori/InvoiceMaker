@@ -3,6 +3,7 @@ const { Resend } = require('resend');
 const { createClient } = require('@supabase/supabase-js');
 const crypto = require('crypto');
 const { sendSms } = require('./send-sms');
+const { getSmsTemplate, renderTemplate } = require('./sms-templates');
 
 const square = new SquareClient({
   token: process.env.SQUARE_ACCESS_TOKEN,
@@ -124,7 +125,14 @@ exports.handler = async (event) => {
 
     if (resendSms && clientPhone) {
       const appUrl = process.env.APP_URL || '';
-      const msg = `Updated invoice from ${business?.name || 'Us'}: $${total.toFixed(2)} due. View & pay at ${appUrl}/client.html — Code: ${passcode}`;
+      const template = await getSmsTemplate(supabase, 'invoice_update');
+      const msg = renderTemplate(template, {
+        bizName: business?.name || 'Us',
+        clientName,
+        amount: total.toFixed(2),
+        passcode,
+        link: `${appUrl}/client.html`,
+      });
       const smsResult = await sendSms(clientPhone, msg);
       if (!smsResult.success) console.error('SMS error:', smsResult.error);
     }

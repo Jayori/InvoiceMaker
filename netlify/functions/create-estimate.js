@@ -1,6 +1,7 @@
 const { Resend } = require('resend');
 const { createClient } = require('@supabase/supabase-js');
 const { sendSms } = require('./send-sms');
+const { getSmsTemplate, renderTemplate } = require('./sms-templates');
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
@@ -24,7 +25,7 @@ exports.handler = async (event) => {
   let body;
   try { body = JSON.parse(event.body); } catch { return { statusCode: 400, body: JSON.stringify({ error: 'Invalid JSON' }) }; }
 
-  const { clientName, clientEmail, clientPhone, clientCompany, clientAddress, clientCity, clientState, clientZip, items, taxRate = 0, notes, sendEmail = true, sendSmsNotification, receiptPhotos, businessProfileId, depositAmount } = body;
+  const { clientName, clientEmail, clientPhone, clientCompany, clientAddress, clientCity, clientState, clientZip, items, taxRate = 0, notes, sendEmail = true, sendSmsNotification, receiptPhotos, businessProfileId, depositAmount, schedulingMode, scheduledAt, scheduledDuration } = body;
   if (!clientName || !clientEmail || !items?.length) {
     return { statusCode: 400, body: JSON.stringify({ error: 'clientName, clientEmail, and items required' }) };
   }
@@ -78,6 +79,9 @@ exports.handler = async (event) => {
       receipt_photos: receiptPhotos?.length ? receiptPhotos : null,
       business_profile_id: businessProfileId || null,
       deposit_amount: depositAmount || null,
+      scheduling_mode: schedulingMode || null,
+      scheduled_at: scheduledAt || null,
+      scheduled_duration: scheduledDuration || null,
     })
     .select().single();
 
@@ -107,8 +111,14 @@ exports.handler = async (event) => {
 
   // Send SMS if requested and phone provided
   if (sendSmsNotification && clientPhone) {
-    const bizName = business?.name || 'Us';
-    const msg = `Estimate from ${bizName}: $${total.toFixed(2)}. View & respond at ${appUrl}/client.html — Code: ${passcode}`;
+    const template = await getSmsTemplate(supabase, 'estimate_new');
+    const msg = renderTemplate(template, {
+      bizName: business?.name || 'Us',
+      clientName,
+      amount: total.toFixed(2),
+      passcode,
+      link: `${appUrl}/client.html`,
+    });
     const smsResult = await sendSms(clientPhone, msg);
     if (!smsResult.success) console.error('SMS error:', smsResult.error);
   }

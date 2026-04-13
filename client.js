@@ -295,9 +295,26 @@ function buildEstimateDetailHtml(est) {
     ${depositBoxHtml}
     ${est.notes ? `<div class="est-notes">${esc(est.notes)}</div>` : ''}
     ${photosHtml}
+
+    ${est.scheduling_mode === 'manager' && est.scheduled_at ? `
+    <div class="scheduled-time-badge">
+      &#128197; Scheduled: ${new Date(est.scheduled_at).toLocaleString('en-US', { weekday:'short', month:'short', day:'numeric', hour:'numeric', minute:'2-digit' })}
+    </div>` : ''}
+
+    ${isPending && est.scheduling_mode === 'client' ? `
+    <div class="slot-picker-section" id="slot-picker-${est.id}">
+      <div class="slot-picker-title">&#128197; Choose Your Appointment Time</div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+        <input type="date" id="slot-date-${est.id}" min="${new Date().toISOString().split('T')[0]}" style="padding:8px 10px;border:1px solid #bbf7d0;border-radius:7px;font-size:14px;">
+        <button class="btn btn-sm" style="background:#16a34a;color:#fff;border:none;" onclick="fetchSlots('${est.id}')">Check Availability</button>
+      </div>
+      <div id="slot-list-${est.id}" class="slot-grid"></div>
+      <div id="slot-selected-${est.id}" class="selected-slot-display" style="display:none;"></div>
+    </div>` : ''}
+
     ${isPending ? `
     <div class="est-actions" id="est-actions-${est.id}">
-      <button class="btn est-btn-approve" onclick="estimateAction('${est.id}', 'approve')">&#10003; Approve</button>
+      <button class="btn est-btn-approve" onclick="${est.scheduling_mode === 'client' ? `approveWithSlot('${est.id}')` : `estimateAction('${est.id}', 'approve')`}">&#10003; Approve</button>
       <button class="btn est-btn-reject" onclick="estimateAction('${est.id}', 'reject')">&#10007; Decline</button>
       <button class="btn est-btn-question" onclick="toggleMsgForm('${est.id}')">? Ask a Question</button>
     </div>` : ''}
@@ -698,14 +715,60 @@ function toggleMsgForm(estimateId) {
   if (form) form.style.display = form.style.display === 'none' ? '' : 'none';
 }
 
-async function estimateAction(estimateId, action) {
-  const word = action === 'approve' ? 'approve' : 'decline';
-  if (!confirm(`Are you sure you want to ${word} this estimate?`)) return;
+// Slot picker state
+const _selectedSlots = {};
+
+async function fetchSlots(estimateId) {
+  const dateInput = document.getElementById(`slot-date-${estimateId}`);
+  const listEl = document.getElementById(`slot-list-${estimateId}`);
+  if (!dateInput?.value) { alert('Please pick a date first.'); return; }
+  listEl.innerHTML = '<span style="font-size:13px;color:#15803d;">Checking availability...</span>';
+  try {
+    const res = await fetch(`/api/get-available-slots?date=${dateInput.value}`);
+    const data = await res.json();
+    if (!data.connected) {
+      listEl.innerHTML = '<span style="font-size:13px;color:#dc2626;">Calendar not connected yet. The business will schedule your appointment.</span>';
+      return;
+    }
+    if (!data.slots?.length) {
+      listEl.innerHTML = '<span style="font-size:13px;color:#6b7280;">No available slots on this date. Try another day.</span>';
+      return;
+    }
+    listEl.innerHTML = data.slots.map(s =>
+      `<button class="slot-btn" onclick="selectSlot('${estimateId}', '${s.iso}', '${s.label}', this)">${s.label}</button>`
+    ).join('');
+  } catch {
+    listEl.innerHTML = '<span style="font-size:13px;color:#dc2626;">Failed to load slots. Please try again.</span>';
+  }
+}
+
+function selectSlot(estimateId, iso, label, btn) {
+  document.querySelectorAll(`#slot-list-${estimateId} .slot-btn`).forEach(b => b.classList.remove('slot-selected'));
+  btn.classList.add('slot-selected');
+  _selectedSlots[estimateId] = { scheduledAt: iso, label };
+  const display = document.getElementById(`slot-selected-${estimateId}`);
+  if (display) { display.textContent = `Selected: ${label}`; display.style.display = ''; }
+}
+
+async function approveWithSlot(estimateId) {
+  const slot = _selectedSlots[estimateId];
+  if (!slot) { alert('Please select a time slot before approving.'); return; }
+  if (!confirm(`Approve this estimate and book ${slot.label}?`)) return;
+  await estimateAction(estimateId, 'approve', slot);
+}
+
+async function estimateAction(estimateId, action, slotData) {
+  if (!slotData) {
+    const word = action === 'approve' ? 'approve' : 'decline';
+    if (!confirm(`Are you sure you want to ${word} this estimate?`)) return;
+  }
 
   try {
+    const body = { estimateId, passcode: clientPasscode, action };
+    if (slotData) { body.scheduledAt = slotData.scheduledAt; }
     const res = await fetch('/api/estimate-action', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ estimateId, passcode: clientPasscode, action }),
+      body: JSON.stringify(body),
     });
     const data = await res.json();
     if (!res.ok) { alert(data.error || 'Failed'); return; }

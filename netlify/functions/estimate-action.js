@@ -2,6 +2,7 @@ const { Resend } = require('resend');
 const { createClient } = require('@supabase/supabase-js');
 const { SquareClient, SquareEnvironment } = require('square');
 const crypto = require('crypto');
+const { createCalendarEvent } = require('./gcal-client');
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
@@ -19,7 +20,7 @@ exports.handler = async (event) => {
   let body;
   try { body = JSON.parse(event.body); } catch { return { statusCode: 400, body: JSON.stringify({ error: 'Invalid JSON' }) }; }
 
-  const { estimateId, passcode, action, message } = body;
+  const { estimateId, passcode, action, message, scheduledAt, scheduledDuration } = body;
   if (!estimateId || !passcode || !action) {
     return { statusCode: 400, body: JSON.stringify({ error: 'estimateId, passcode, and action required' }) };
   }
@@ -70,6 +71,33 @@ exports.handler = async (event) => {
       updateFields.deposit_payment_link = depositPaymentLink;
       updateFields.deposit_paid = false;
     }
+
+    // Book Google Calendar event on approval
+    if (action === 'approve') {
+      // Client picks mode: use the slot they selected
+      // Manager picks mode: use the scheduled_at already stored on the estimate
+      const slotTime = scheduledAt || estimate.scheduled_at;
+      const duration = scheduledDuration || estimate.scheduled_duration || 60;
+      if (slotTime) {
+        // Save selected slot if client picked it
+        if (scheduledAt) {
+          updateFields.scheduled_at = scheduledAt;
+          updateFields.scheduled_duration = duration;
+        }
+        try {
+          const eventId = await createCalendarEvent({
+            title: `Job — ${estimate.client_name}`,
+            description: `Estimate ${estimate.estimate_number}\n$${Number(estimate.total).toFixed(2)}`,
+            scheduledAt: slotTime,
+            durationMins: duration,
+          });
+          updateFields.gcal_event_id = eventId;
+        } catch (err) {
+          console.error('Google Calendar event creation failed (non-fatal):', err.message);
+        }
+      }
+    }
+
     await supabase.from('estimates').update(updateFields).eq('id', estimateId);
 
     if (business?.email) {

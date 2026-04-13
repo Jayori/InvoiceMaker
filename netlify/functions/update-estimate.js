@@ -1,6 +1,7 @@
 const { Resend } = require('resend');
 const { createClient } = require('@supabase/supabase-js');
 const { sendSms } = require('./send-sms');
+const { getSmsTemplate, renderTemplate } = require('./sms-templates');
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
@@ -81,8 +82,14 @@ exports.handler = async (event) => {
     } catch (err) { console.error('Resend error:', err); }
 
     if (resendSms && clientPhone) {
-      const bizName = business?.name || 'Us';
-      const msg = `Updated estimate from ${bizName}: $${total.toFixed(2)}. View & respond at ${appUrl}/client.html — Code: ${passcode}`;
+      const template = await getSmsTemplate(supabase, 'estimate_update');
+      const msg = renderTemplate(template, {
+        bizName: business?.name || 'Us',
+        clientName,
+        amount: total.toFixed(2),
+        passcode,
+        link: `${appUrl}/client.html`,
+      });
       const smsResult = await sendSms(clientPhone, msg);
       if (!smsResult.success) console.error('SMS error:', smsResult.error);
     }

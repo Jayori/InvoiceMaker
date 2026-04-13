@@ -995,6 +995,43 @@
             </div>
           </div>
 
+          <!-- SMS Templates card -->
+          <div class="card" style="margin-bottom:28px;">
+            <div class="card-title">SMS Message Templates</div>
+            <p style="font-size:13px;color:var(--gray-500);margin:0 0 18px;">Customize the text sent for each event type. Use variables: <code style="background:var(--gray-100);padding:1px 5px;border-radius:4px;font-size:12px;">{bizName}</code> <code style="background:var(--gray-100);padding:1px 5px;border-radius:4px;font-size:12px;">{clientName}</code> <code style="background:var(--gray-100);padding:1px 5px;border-radius:4px;font-size:12px;">{amount}</code> <code style="background:var(--gray-100);padding:1px 5px;border-radius:4px;font-size:12px;">{passcode}</code> <code style="background:var(--gray-100);padding:1px 5px;border-radius:4px;font-size:12px;">{link}</code> <code style="background:var(--gray-100);padding:1px 5px;border-radius:4px;font-size:12px;">{date}</code> <code style="background:var(--gray-100);padding:1px 5px;border-radius:4px;font-size:12px;">{oldDate}</code> <code style="background:var(--gray-100);padding:1px 5px;border-radius:4px;font-size:12px;">{serviceCall}</code></p>
+            <div style="display:flex;flex-direction:column;gap:18px;">
+              <div class="form-group">
+                <label>New Invoice</label>
+                <textarea id="sms-invoice-new" rows="2" style="font-size:13px;"></textarea>
+              </div>
+              <div class="form-group">
+                <label>Updated Invoice</label>
+                <textarea id="sms-invoice-update" rows="2" style="font-size:13px;"></textarea>
+              </div>
+              <div class="form-group">
+                <label>New Estimate</label>
+                <textarea id="sms-estimate-new" rows="2" style="font-size:13px;"></textarea>
+              </div>
+              <div class="form-group">
+                <label>Updated Estimate</label>
+                <textarea id="sms-estimate-update" rows="2" style="font-size:13px;"></textarea>
+              </div>
+              <div class="form-group">
+                <label>Event Confirmed</label>
+                <textarea id="sms-event-confirm" rows="2" style="font-size:13px;"></textarea>
+              </div>
+              <div class="form-group">
+                <label>Event Rescheduled</label>
+                <textarea id="sms-event-reschedule" rows="2" style="font-size:13px;"></textarea>
+              </div>
+            </div>
+            <div style="display:flex;align-items:center;gap:12px;margin-top:18px;">
+              <button type="button" class="btn btn-secondary btn-sm" onclick="resetSmsTemplates()">Reset to Defaults</button>
+              <button type="button" class="btn btn-primary btn-sm" onclick="saveSmsTemplates()">Save Templates</button>
+              <span id="sms-templates-saved" style="display:none;font-size:13px;color:var(--green);font-weight:500;">Saved!</span>
+            </div>
+          </div>
+
           <h1 class="section-title" style="margin-bottom:24px;">Business Profiles</h1>
 
           <!-- Saved profiles list -->

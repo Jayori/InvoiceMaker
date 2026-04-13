@@ -7,7 +7,7 @@ exports.handler = async (event) => {
   try { fields = JSON.parse(event.body || '{}'); } catch { return { statusCode: 400, body: 'Invalid JSON' }; }
 
   // Only allow updating gcal-related fields
-  const allowed = ['gcal_refresh_token', 'gcal_calendar_id', 'work_hours_start', 'work_hours_end', 'work_hours_per_day', 'blocked_days'];
+  const allowed = ['gcal_refresh_token', 'gcal_calendar_id', 'work_hours_start', 'work_hours_end', 'work_hours_per_day', 'blocked_days', 'sms_templates'];
   const update = {};
   for (const key of allowed) {
     if (key in fields) update[key] = fields[key];

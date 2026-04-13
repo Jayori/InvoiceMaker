@@ -2,6 +2,7 @@ const { Resend } = require('resend');
 const { createClient } = require('@supabase/supabase-js');
 const { sendSms } = require('./send-sms');
 const { createCalendarEvent } = require('./gcal-client');
+const { getSmsTemplate, renderTemplate } = require('./sms-templates');
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
@@ -116,7 +117,14 @@ exports.handler = async (event) => {
     // SMS
     if (clientPhone) {
       const scText = serviceCall?.amount ? ` Service call fee: $${Number(serviceCall.amount).toFixed(2)}.` : '';
-      const msg = `${bizName}: Your appointment is confirmed for ${dateStr}.${scText} Questions? Reply here or visit ${process.env.APP_URL}/client.html`;
+      const template = await getSmsTemplate(supabase, 'event_confirm');
+      const msg = renderTemplate(template, {
+        bizName,
+        clientName,
+        date: dateStr,
+        serviceCall: scText,
+        link: `${process.env.APP_URL}/client.html`,
+      });
       await sendSms(clientPhone, msg);
     }
   }

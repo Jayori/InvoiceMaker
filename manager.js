@@ -3007,6 +3007,7 @@ async function loadGcalStatus() {
     if (connected) {
       renderWorkHoursGrid(profile.work_hours_per_day || null);
     }
+    loadSmsTemplates(profile);
   } catch {}
 }
 
@@ -3051,6 +3052,58 @@ async function saveWorkHoursPerDay() {
 
 // Legacy — kept for backward compatibility
 async function saveWorkHours() { return saveWorkHoursPerDay(); }
+
+// ─── SMS Templates ─────────────────────────────────────────────────────────────
+
+const SMS_DEFAULTS = {
+  'invoice_new':      'Invoice from {bizName}: ${amount} due. View & pay at {link} — Code: {passcode}',
+  'invoice_update':   'Updated invoice from {bizName}: ${amount} due. View & pay at {link} — Code: {passcode}',
+  'estimate_new':     'Estimate from {bizName}: ${amount}. View & respond at {link} — Code: {passcode}',
+  'estimate_update':  'Updated estimate from {bizName}: ${amount}. View & respond at {link} — Code: {passcode}',
+  'event_confirm':    '{bizName}: Your appointment is confirmed for {date}.{serviceCall} Questions? Visit {link}',
+  'event_reschedule': '{bizName}: Your appointment has been rescheduled from {oldDate} to {date}. Questions? Call/text us.',
+};
+
+const SMS_FIELD_MAP = {
+  'invoice_new':      'sms-invoice-new',
+  'invoice_update':   'sms-invoice-update',
+  'estimate_new':     'sms-estimate-new',
+  'estimate_update':  'sms-estimate-update',
+  'event_confirm':    'sms-event-confirm',
+  'event_reschedule': 'sms-event-reschedule',
+};
+
+function loadSmsTemplates(profile) {
+  const saved = profile?.sms_templates || {};
+  for (const [key, fieldId] of Object.entries(SMS_FIELD_MAP)) {
+    const el = document.getElementById(fieldId);
+    if (el) el.value = saved[key] || SMS_DEFAULTS[key] || '';
+  }
+}
+
+function resetSmsTemplates() {
+  for (const [key, fieldId] of Object.entries(SMS_FIELD_MAP)) {
+    const el = document.getElementById(fieldId);
+    if (el) el.value = SMS_DEFAULTS[key] || '';
+  }
+}
+
+async function saveSmsTemplates() {
+  const templates = {};
+  for (const [key, fieldId] of Object.entries(SMS_FIELD_MAP)) {
+    const el = document.getElementById(fieldId);
+    if (el) templates[key] = el.value.trim() || SMS_DEFAULTS[key];
+  }
+  try {
+    await fetch('/api/save-gcal-settings', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sms_templates: templates }),
+    });
+    const saved = document.getElementById('sms-templates-saved');
+    saved.style.display = '';
+    setTimeout(() => { saved.style.display = 'none'; }, 2000);
+  } catch { showToast('Failed to save templates.', 'error'); }
+}
 
 // Handle ?gcal= URL param after OAuth redirect
 (function handleGcalRedirect() {

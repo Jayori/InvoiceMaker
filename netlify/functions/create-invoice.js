@@ -3,6 +3,8 @@ const { Resend } = require('resend');
 const { createClient } = require('@supabase/supabase-js');
 const crypto = require('crypto');
 const { sendSms } = require('./send-sms');
+const { createCalendarEvent } = require('./gcal-client');
+const { getSmsTemplate, renderTemplate } = require('./sms-templates');
 
 const square = new SquareClient({
   token: process.env.SQUARE_ACCESS_TOKEN,
@@ -176,7 +178,7 @@ exports.handler = async (event) => {
   let body;
   try { body = JSON.parse(event.body); } catch { return { statusCode: 400, body: JSON.stringify({ error: 'Invalid JSON' }) }; }
 
-  const { clientName, clientEmail, clientPhone, clientCompany, clientAddress, clientCity, clientState, clientZip, items, taxRate = 0, notes, dueDate, sendEmail = true, sendSmsNotification, receiptPhotos, businessProfileId } = body;
+  const { clientName, clientEmail, clientPhone, clientCompany, clientAddress, clientCity, clientState, clientZip, items, taxRate = 0, notes, dueDate, sendEmail = true, sendSmsNotification, receiptPhotos, businessProfileId, scheduledAt, scheduledDuration } = body;
   if (!clientName || !clientEmail || !items?.length) {
     return { statusCode: 400, body: JSON.stringify({ error: 'clientName, clientEmail, and at least one item are required' }) };
   }
@@ -263,10 +265,25 @@ exports.handler = async (event) => {
   // Save to Supabase
   const { data: invoice, error: dbError } = await supabase
     .from('invoices')
-    .insert({ invoice_number: invoiceNumber, passcode, client_name: clientName, client_email: clientEmail, client_phone: clientPhone || null, client_company: clientCompany || null, client_address: clientAddress || null, client_city: clientCity || null, client_state: clientState || null, client_zip: clientZip || null, items, subtotal, tax_rate: taxRate, tax_amount: taxAmount, total, notes: notes || null, due_date: dueDate || null, square_payment_link: squarePaymentLink, square_order_id: squareOrderId, receipt_photos: receiptPhotos?.length ? receiptPhotos : null, business_profile_id: businessProfileId || null })
+    .insert({ invoice_number: invoiceNumber, passcode, client_name: clientName, client_email: clientEmail, client_phone: clientPhone || null, client_company: clientCompany || null, client_address: clientAddress || null, client_city: clientCity || null, client_state: clientState || null, client_zip: clientZip || null, items, subtotal, tax_rate: taxRate, tax_amount: taxAmount, total, notes: notes || null, due_date: dueDate || null, square_payment_link: squarePaymentLink, square_order_id: squareOrderId, receipt_photos: receiptPhotos?.length ? receiptPhotos : null, business_profile_id: businessProfileId || null, scheduled_at: scheduledAt || null, scheduled_duration: scheduledDuration || null })
     .select().single();
 
   if (dbError) return { statusCode: 502, body: JSON.stringify({ error: 'Failed to save invoice', detail: dbError.message }) };
+
+  // Book Google Calendar event if a time was scheduled
+  if (scheduledAt) {
+    try {
+      const eventId = await createCalendarEvent({
+        title: `Invoice — ${clientName}`,
+        description: `Invoice ${invoiceNumber}\n$${Number(total).toFixed(2)}`,
+        scheduledAt,
+        durationMins: scheduledDuration || 60,
+      });
+      await supabase.from('invoices').update({ gcal_event_id: eventId }).eq('id', invoice.id);
+    } catch (err) {
+      console.error('Google Calendar event creation failed (non-fatal):', err.message);
+    }
+  }
 
   // Send email if requested
   if (sendEmail) {
@@ -283,8 +300,14 @@ exports.handler = async (event) => {
   // Send SMS if requested and phone provided
   if (sendSmsNotification && clientPhone) {
     const appUrl = process.env.APP_URL || '';
-    const bizName = business?.name || 'Us';
-    const msg = `Invoice from ${bizName}: $${total.toFixed(2)} due. View & pay at ${appUrl}/client.html — Code: ${passcode}`;
+    const template = await getSmsTemplate(supabase, 'invoice_new');
+    const msg = renderTemplate(template, {
+      bizName: business?.name || 'Us',
+      clientName,
+      amount: total.toFixed(2),
+      passcode,
+      link: `${appUrl}/client.html`,
+    });
     const smsResult = await sendSms(clientPhone, msg);
     if (!smsResult.success) console.error('SMS error:', smsResult.error);
   }

@@ -35,3 +35,7 @@ set work_hours_per_day = '{
   "6": null
 }'::jsonb
 where id = 1 and work_hours_per_day is null;
+
+-- SMS templates (customizable per message type)
+alter table business_profile
+  add column if not exists sms_templates jsonb default '{}'::jsonb;
