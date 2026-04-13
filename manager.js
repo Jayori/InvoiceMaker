@@ -533,7 +533,8 @@ function renderUpcoming() {
     const scBadge = e.service_call?.amount ? `<span style="font-size:11px;background:#fef3c7;color:#92400e;padding:2px 7px;border-radius:99px;font-weight:700;">$${Number(e.service_call.amount).toFixed(0)} fee</span>` : '';
     const typeLabel = e.type === 'invoice' ? 'Invoice' : e.type === 'estimate' ? 'Estimate' : 'Event';
     const typeClass = e.type === 'invoice' ? 'type-invoice' : e.type === 'estimate' ? 'type-estimate' : 'type-event';
-    return `<div class="upcoming-event-card">
+    const clickable = e.type === 'event';
+    return `<div class="upcoming-event-card${clickable ? ' upcoming-event-card-clickable' : ''}" ${clickable ? `onclick="openEventDetail('${e.id}')"` : ''}>
       <div class="upcoming-event-date">${dateStr} &middot; ${timeStr}${dur}</div>
       <div class="upcoming-event-client">${esc(e.client_name)}</div>
       ${e.notes ? `<div style="font-size:12px;color:var(--gray-400);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(e.notes)}</div>` : ''}
@@ -620,13 +621,18 @@ function showCalDay(dateStr) {
   detail.innerHTML = `<div style="font-size:13px;font-weight:700;color:var(--gray-700);margin-bottom:10px;">${label}</div>` +
     dayEvents.map(e => {
       const t = new Date(e.scheduled_at).toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit' });
-      const dur = e.scheduled_duration ? ` &middot; ${e.scheduled_duration} min` : '';
-      return `<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--gray-100);">
+      const durMins = e.duration_mins || e.scheduled_duration;
+      const dur = durMins ? ` &middot; ${durMins} min` : '';
+      const isEvent = e.type === 'event';
+      const typeClass = e.type === 'invoice' ? 'type-invoice' : e.type === 'estimate' ? 'type-estimate' : 'type-event';
+      const typeLabel = e.type === 'invoice' ? 'Invoice' : e.type === 'estimate' ? 'Estimate' : 'Event';
+      return `<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--gray-100);${isEvent ? 'cursor:pointer;' : ''}" ${isEvent ? `onclick="openEventDetail('${e.id}')"` : ''}>
         <div style="flex:1;">
           <div style="font-weight:600;color:var(--gray-900);">${esc(e.client_name)}</div>
-          <div style="font-size:12px;color:var(--gray-500);">${t}${dur} &middot; ${esc(e.label)}</div>
+          <div style="font-size:12px;color:var(--gray-500);">${t}${dur}</div>
         </div>
-        <span class="upcoming-event-type ${e.type === 'invoice' ? 'type-invoice' : e.type === 'estimate' ? 'type-estimate' : 'type-event'}">${e.type === 'invoice' ? 'Invoice' : e.type === 'estimate' ? 'Estimate' : 'Event'}</span>
+        <span class="upcoming-event-type ${typeClass}">${typeLabel}</span>
+        ${isEvent ? '<svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" style="color:var(--gray-300);flex-shrink:0;"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>' : ''}
       </div>`;
     }).join('');
 }
@@ -3141,14 +3147,20 @@ document.addEventListener('DOMContentLoaded', () => {
 // ─── Inline Schedule Event Modal ──────────────────────────────────────────────
 
 let _smServiceCall = null;
+let _smEditId = null;
 
-function openSchedModal(client) {
+function openSchedModal(client, editEvt) {
+  _smEditId = editEvt?.id || null;
+
   // Reset form
   ['sm-client-name','sm-client-email','sm-client-phone','sm-notes'].forEach(id => {
     const el = document.getElementById(id); if (el) el.value = '';
   });
   document.getElementById('sm-date').value = new Date().toISOString().split('T')[0];
   document.getElementById('sm-time').value = '';
+  document.getElementById('sm-time-display').textContent = 'Set time';
+  document.getElementById('sm-time-btn').style.borderColor = '';
+  document.getElementById('clock-picker-wrap').style.display = 'none';
   document.getElementById('sm-duration').value = '60';
   document.getElementById('sm-error').style.display = 'none';
   document.getElementById('sm-suggestions').style.display = 'none';
@@ -3157,25 +3169,68 @@ function openSchedModal(client) {
   smClearSC();
   _smServiceCall = null;
 
-  // Pre-fill client if provided
-  if (client) {
-    document.getElementById('sm-client-name').value = client.name || '';
-    document.getElementById('sm-client-email').value = client.email || '';
-    if (client.phone) {
-      const digits = client.phone.replace(/\D/g, '');
-      // Strip leading country code (1) to show just the 10-digit number
+  const titleEl = document.getElementById('sched-modal-title');
+  const submitBtn = document.getElementById('sm-submit-btn');
+
+  if (editEvt) {
+    titleEl.textContent = 'Reschedule Event';
+    submitBtn.textContent = 'Reschedule';
+    document.getElementById('sm-client-name').value = editEvt.client_name || '';
+    document.getElementById('sm-client-email').value = editEvt.client_email || '';
+    if (editEvt.client_phone) {
+      const digits = editEvt.client_phone.replace(/\D/g, '');
       document.getElementById('sm-client-phone').value = digits.length === 11 && digits.startsWith('1') ? digits.slice(1) : digits;
       document.getElementById('sm-client-cc').value = '+1';
+    }
+    if (editEvt.scheduled_at) {
+      const d = new Date(editEvt.scheduled_at);
+      document.getElementById('sm-date').value = d.toISOString().split('T')[0];
+      const h24 = d.getHours(), m = d.getMinutes();
+      document.getElementById('sm-time').value = `${String(h24).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
+      _clockH = h24 % 12 || 12;
+      _clockM = Math.round(m / 5) * 5; if (_clockM === 60) _clockM = 55;
+      _clockAmPm = h24 < 12 ? 'AM' : 'PM';
+      document.getElementById('sm-time-display').textContent = `${_clockH}:${String(_clockM).padStart(2,'0')} ${_clockAmPm}`;
+      document.getElementById('sm-time-btn').style.borderColor = 'var(--blue)';
+    }
+    if (editEvt.duration_mins) {
+      const sel = document.getElementById('sm-duration');
+      if ([30,60,90,120,180,240,480].includes(editEvt.duration_mins)) sel.value = String(editEvt.duration_mins);
+    }
+    if (editEvt.notes) document.getElementById('sm-notes').value = editEvt.notes;
+    if (editEvt.service_call?.amount) {
+      _smServiceCall = editEvt.service_call;
+      document.querySelectorAll('.sched-sc-btn').forEach(b => {
+        if (Number(b.textContent.replace('$','')) === Number(editEvt.service_call.amount)) b.classList.add('sched-sc-active');
+      });
+      const disp = document.getElementById('sm-sc-display');
+      disp.textContent = `Service Call — $${Number(editEvt.service_call.amount).toFixed(0)}.00`;
+      disp.style.display = '';
+      document.getElementById('sm-sc-clear').style.display = '';
+    }
+  } else {
+    titleEl.textContent = 'New Event';
+    submitBtn.textContent = 'Schedule Event';
+    if (client) {
+      document.getElementById('sm-client-name').value = client.name || '';
+      document.getElementById('sm-client-email').value = client.email || '';
+      if (client.phone) {
+        const digits = client.phone.replace(/\D/g, '');
+        document.getElementById('sm-client-phone').value = digits.length === 11 && digits.startsWith('1') ? digits.slice(1) : digits;
+        document.getElementById('sm-client-cc').value = '+1';
+      }
     }
   }
 
   const overlay = document.getElementById('sched-modal-overlay');
-  overlay.style.display = 'flex'; // overrides the initial display:none
+  overlay.style.display = 'flex';
   setTimeout(() => document.getElementById('sm-client-name').focus(), 100);
 }
 
 function closeSchedModal() {
+  _smEditId = null;
   document.getElementById('sched-modal-overlay').style.display = 'none';
+  document.getElementById('clock-picker-wrap').style.display = 'none';
 }
 
 function smClientSearch(val) {
@@ -3235,6 +3290,7 @@ async function submitSchedModal() {
   const notifyEmail = document.getElementById('sm-notify-email').checked;
   const notifySms   = document.getElementById('sm-notify-sms').checked;
   const errEl       = document.getElementById('sm-error');
+  const isEdit      = !!_smEditId;
   errEl.style.display = 'none';
 
   if (!clientName)  { errEl.textContent = 'Client name is required.';  errEl.style.display = ''; return; }
@@ -3243,26 +3299,243 @@ async function submitSchedModal() {
 
   const scheduledAt = new Date(`${date}T${time}`).toISOString();
   const btn = document.getElementById('sm-submit-btn');
-  btn.disabled = true; btn.textContent = 'Scheduling...';
+  btn.disabled = true; btn.textContent = isEdit ? 'Rescheduling...' : 'Scheduling...';
 
   try {
-    const res = await fetch('/api/create-scheduled-event', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        clientName, clientEmail, clientPhone, scheduledAt, durationMins,
-        serviceCall: _smServiceCall || null,
-        notes: notes || null,
-        sendNotifications: notifyEmail || notifySms,
-      }),
-    });
+    let res;
+    if (isEdit) {
+      res = await fetch('/api/update-scheduled-event', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: _smEditId, scheduledAt, durationMins,
+          serviceCall: _smServiceCall || null,
+          notes: notes || null,
+          sendNotifications: notifyEmail || notifySms,
+        }),
+      });
+    } else {
+      res = await fetch('/api/create-scheduled-event', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          clientName, clientEmail, clientPhone, scheduledAt, durationMins,
+          serviceCall: _smServiceCall || null,
+          notes: notes || null,
+          sendNotifications: notifyEmail || notifySms,
+        }),
+      });
+    }
     const data = await res.json();
-    if (!res.ok) { errEl.textContent = data.error || 'Failed to create event.'; errEl.style.display = ''; return; }
+    if (!res.ok) { errEl.textContent = data.error || 'Failed.'; errEl.style.display = ''; return; }
     closeSchedModal();
-    showToast('Event scheduled!', 'success');
+    showToast(isEdit ? 'Event rescheduled!' : 'Event scheduled!', 'success');
     loadSchedule();
   } catch {
     errEl.textContent = 'Network error. Please try again.'; errEl.style.display = '';
   } finally {
-    btn.disabled = false; btn.textContent = 'Schedule Event';
+    btn.disabled = false; btn.textContent = isEdit ? 'Reschedule' : 'Schedule Event';
+  }
+}
+
+// ─── Clock Picker ─────────────────────────────────────────────────────────────
+
+let _clockStep = 'hour'; // 'hour' | 'minute'
+let _clockH = 9;         // 1–12
+let _clockM = 0;         // 0, 5, 10 … 55
+let _clockAmPm = 'AM';
+
+function openClockPicker() {
+  const val = document.getElementById('sm-time').value;
+  if (val) {
+    const [hStr, mStr] = val.split(':');
+    const h24 = parseInt(hStr, 10);
+    _clockH = h24 % 12 || 12;
+    _clockM = Math.round(parseInt(mStr, 10) / 5) * 5; if (_clockM === 60) _clockM = 55;
+    _clockAmPm = h24 < 12 ? 'AM' : 'PM';
+  } else {
+    _clockH = 9; _clockM = 0; _clockAmPm = 'AM';
+  }
+  _clockStep = 'hour';
+  const wrap = document.getElementById('clock-picker-wrap');
+  wrap.style.display = '';
+  _buildClockHtml();
+  document.getElementById('sm-time-btn').style.borderColor = 'var(--blue)';
+}
+
+function closeClockPicker(confirm) {
+  if (confirm) {
+    let h24 = _clockH % 12;
+    if (_clockAmPm === 'PM') h24 += 12;
+    const val = String(h24).padStart(2,'0') + ':' + String(_clockM).padStart(2,'0');
+    document.getElementById('sm-time').value = val;
+    document.getElementById('sm-time-display').textContent = _clockH + ':' + String(_clockM).padStart(2,'0') + ' ' + _clockAmPm;
+  }
+  document.getElementById('clock-picker-wrap').style.display = 'none';
+}
+
+function _buildClockHtml() {
+  const wrap = document.getElementById('clock-picker-wrap');
+  if (!wrap) return;
+  const hDisp = String(_clockH).padStart(2,'0');
+  const mDisp = String(_clockM).padStart(2,'0');
+  const hourActive = _clockStep === 'hour';
+  const hBg = hourActive ? 'background:#eff6ff;color:#1a56db;' : 'color:var(--gray-400);';
+  const mBg = !hourActive ? 'background:#eff6ff;color:#1a56db;' : 'color:var(--gray-400);';
+  const amBg = _clockAmPm === 'AM' ? '#1a56db' : '#fff';
+  const amClr = _clockAmPm === 'AM' ? '#fff' : 'var(--gray-600)';
+  const amBdr = _clockAmPm === 'AM' ? '#1a56db' : 'var(--gray-200)';
+  const pmBg = _clockAmPm === 'PM' ? '#1a56db' : '#fff';
+  const pmClr = _clockAmPm === 'PM' ? '#fff' : 'var(--gray-600)';
+  const pmBdr = _clockAmPm === 'PM' ? '#1a56db' : 'var(--gray-200)';
+  const stepLabel = hourActive ? 'Select Hour' : 'Select Minute';
+
+  wrap.innerHTML =
+    '<div style="display:flex;align-items:center;justify-content:center;gap:2px;margin-bottom:18px;">' +
+      '<div onclick="clockGoStep(\'hour\')" style="font-size:44px;font-weight:700;cursor:pointer;padding:4px 10px;border-radius:10px;line-height:1;' + hBg + '">' + hDisp + '</div>' +
+      '<div style="font-size:44px;font-weight:300;color:var(--gray-300);line-height:1;padding:0 2px;">:</div>' +
+      '<div onclick="clockGoStep(\'minute\')" style="font-size:44px;font-weight:700;cursor:pointer;padding:4px 10px;border-radius:10px;line-height:1;' + mBg + '">' + mDisp + '</div>' +
+      '<div style="display:flex;flex-direction:column;gap:5px;margin-left:12px;">' +
+        '<button type="button" onclick="clockSetAmPm(\'AM\')" style="padding:6px 11px;border-radius:8px;border:1.5px solid ' + amBdr + ';background:' + amBg + ';color:' + amClr + ';font-size:13px;font-weight:700;cursor:pointer;">AM</button>' +
+        '<button type="button" onclick="clockSetAmPm(\'PM\')" style="padding:6px 11px;border-radius:8px;border:1.5px solid ' + pmBdr + ';background:' + pmBg + ';color:' + pmClr + ';font-size:13px;font-weight:700;cursor:pointer;">PM</button>' +
+      '</div>' +
+    '</div>' +
+    '<div style="font-size:11px;font-weight:700;color:var(--gray-400);text-transform:uppercase;letter-spacing:0.08em;text-align:center;margin-bottom:10px;">' + stepLabel + '</div>' +
+    '<svg id="clock-svg" viewBox="0 0 300 300" width="100%" style="display:block;max-width:260px;margin:0 auto;"></svg>' +
+    '<button type="button" onclick="closeClockPicker(true)" style="margin-top:14px;width:100%;padding:12px;background:#1a56db;color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;">Done</button>';
+
+  _renderClockFace();
+}
+
+function _renderClockFace() {
+  const svg = document.getElementById('clock-svg');
+  if (!svg) return;
+  const cx = 150, cy = 150;
+  const isHour = _clockStep === 'hour';
+  const nums = isHour
+    ? [12,1,2,3,4,5,6,7,8,9,10,11]
+    : [0,5,10,15,20,25,30,35,40,45,50,55];
+
+  const handAngle = isHour
+    ? (_clockH % 12) / 12 * 2 * Math.PI - Math.PI / 2
+    : _clockM / 60 * 2 * Math.PI - Math.PI / 2;
+  const hx = (cx + Math.cos(handAngle) * 88).toFixed(1);
+  const hy = (cy + Math.sin(handAngle) * 88).toFixed(1);
+
+  let items = '';
+  for (let i = 0; i < nums.length; i++) {
+    const num = nums[i];
+    const a = i / 12 * 2 * Math.PI - Math.PI / 2;
+    const nx = (cx + Math.cos(a) * 95).toFixed(1);
+    const ny = (cy + Math.sin(a) * 95).toFixed(1);
+    const sel = isHour ? _clockH === num : _clockM === num;
+    const fillCircle = sel ? '#1a56db' : 'transparent';
+    const fillText = sel ? '#fff' : '#374151';
+    const fw = sel ? '700' : '500';
+    items += '<g onclick="clockPick(' + num + ')" style="cursor:pointer;">' +
+      '<circle cx="' + nx + '" cy="' + ny + '" r="22" fill="' + fillCircle + '"/>' +
+      '<text x="' + nx + '" y="' + ny + '" text-anchor="middle" dominant-baseline="central" fill="' + fillText + '" font-size="14" font-weight="' + fw + '" font-family="system-ui,Arial,sans-serif">' + num + '</text>' +
+      '</g>';
+  }
+
+  svg.innerHTML =
+    '<circle cx="' + cx + '" cy="' + cy + '" r="128" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1.5"/>' +
+    '<line x1="' + cx + '" y1="' + cy + '" x2="' + hx + '" y2="' + hy + '" stroke="#1a56db" stroke-width="3" stroke-linecap="round"/>' +
+    '<circle cx="' + cx + '" cy="' + cy + '" r="5" fill="#1a56db"/>' +
+    '<circle cx="' + hx + '" cy="' + hy + '" r="18" fill="#1a56db" opacity="0.18"/>' +
+    items;
+}
+
+function clockGoStep(step) {
+  _clockStep = step;
+  _buildClockHtml();
+}
+
+function clockSetAmPm(ampm) {
+  _clockAmPm = ampm;
+  _buildClockHtml();
+}
+
+function clockPick(num) {
+  if (_clockStep === 'hour') {
+    _clockH = num;
+    _clockStep = 'minute';
+    _buildClockHtml();
+  } else {
+    _clockM = num;
+    closeClockPicker(true);
+  }
+}
+
+// ─── Event Detail Sheet ────────────────────────────────────────────────────────
+
+let _detailEventId = null;
+
+function openEventDetail(id) {
+  const evt = calEvents.find(function(e) { return String(e.id) === String(id); });
+  if (!evt) return;
+  _detailEventId = id;
+
+  const d = new Date(evt.scheduled_at);
+  const timeStr = d.toLocaleString('en-US', {
+    weekday:'long', month:'long', day:'numeric', year:'numeric',
+    hour:'numeric', minute:'2-digit', hour12:true,
+  });
+  const durMins = evt.duration_mins || evt.scheduled_duration || 60;
+  const durStr = durMins >= 60
+    ? (durMins/60) + ' hour' + (durMins > 60 ? 's' : '')
+    : durMins + ' min';
+
+  document.getElementById('evt-detail-name').textContent = evt.client_name;
+  document.getElementById('evt-detail-time').textContent = timeStr;
+  document.getElementById('evt-detail-dur').textContent = durStr;
+
+  let chips = '';
+  if (evt.client_email) chips += '<a href="mailto:' + esc(evt.client_email) + '" class="sch-contact-chip">' + esc(evt.client_email) + '</a>';
+  if (evt.client_phone) chips += '<a href="tel:' + esc(evt.client_phone) + '" class="sch-contact-chip">' + esc(evt.client_phone) + '</a>';
+  document.getElementById('evt-detail-contacts').innerHTML = chips;
+
+  const scRow = document.getElementById('evt-detail-sc-row');
+  if (evt.service_call && evt.service_call.amount) {
+    document.getElementById('evt-detail-sc-amt').textContent = '$' + Number(evt.service_call.amount).toFixed(2);
+    scRow.style.display = '';
+  } else {
+    scRow.style.display = 'none';
+  }
+
+  const notesWrap = document.getElementById('evt-detail-notes-wrap');
+  if (evt.notes) {
+    notesWrap.textContent = evt.notes;
+    notesWrap.style.display = '';
+  } else {
+    notesWrap.style.display = 'none';
+  }
+
+  document.getElementById('evt-detail-overlay').style.display = '';
+}
+
+function closeEventDetail() {
+  document.getElementById('evt-detail-overlay').style.display = 'none';
+  _detailEventId = null;
+}
+
+function rescheduleCurrentEvent() {
+  const evt = calEvents.find(function(e) { return String(e.id) === String(_detailEventId); });
+  if (!evt) return;
+  closeEventDetail();
+  openSchedModal(null, evt);
+}
+
+async function deleteCurrentEvent() {
+  if (!_detailEventId) return;
+  const evt = calEvents.find(function(e) { return String(e.id) === String(_detailEventId); });
+  const name = evt ? evt.client_name : 'this event';
+  if (!confirm('Delete event for ' + name + '? This cannot be undone.')) return;
+  try {
+    const res = await fetch('/api/delete-scheduled-event?id=' + _detailEventId, { method: 'POST' });
+    if (!res.ok) { showToast('Failed to delete event.', 'error'); return; }
+    closeEventDetail();
+    showToast('Event deleted.', 'success');
+    loadSchedule();
+  } catch(e) {
+    showToast('Network error.', 'error');
   }
 }
