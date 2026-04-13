@@ -576,7 +576,15 @@
                 <div id="sm-suggestions" style="display:none;position:absolute;top:40px;left:0;right:0;background:#fff;border:1px solid var(--gray-200);border-radius:10px;box-shadow:0 8px 20px rgba(0,0,0,0.1);z-index:300;overflow:hidden;"></div>
               </div>
               <input type="email" id="sm-client-email" placeholder="Email address *" style="width:100%;margin-bottom:10px;">
-              <input type="tel" id="sm-client-phone" placeholder="Phone (for SMS)" style="width:100%;margin-bottom:16px;">
+              <div style="display:flex;gap:8px;margin-bottom:16px;">
+                <select id="sm-client-cc" style="width:90px;flex-shrink:0;">
+                  <option value="+1">+1 US</option>
+                  <option value="+1-CA">+1 CA</option>
+                  <option value="+44">+44 UK</option>
+                  <option value="+61">+61 AU</option>
+                </select>
+                <input type="tel" id="sm-client-phone" placeholder="(XXX) XXX-XXXX" style="flex:1;">
+              </div>
 
               <!-- Date & Time -->
               <div style="font-size:11px;font-weight:700;color:var(--gray-400);text-transform:uppercase;letter-spacing:0.07em;margin-bottom:8px;">Date & Time</div>

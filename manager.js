@@ -3110,7 +3110,9 @@ function openSchedModal(client) {
     document.getElementById('sm-client-email').value = client.email || '';
     if (client.phone) {
       const digits = client.phone.replace(/\D/g, '');
-      document.getElementById('sm-client-phone').value = digits.length > 10 ? digits.slice(-10) : digits;
+      // Strip leading country code (1) to show just the 10-digit number
+      document.getElementById('sm-client-phone').value = digits.length === 11 && digits.startsWith('1') ? digits.slice(1) : digits;
+      document.getElementById('sm-client-cc').value = '+1';
     }
   }
 
@@ -3143,7 +3145,8 @@ function smSelectClient(c) {
   document.getElementById('sm-client-email').value = c.email || '';
   if (c.phone) {
     const digits = c.phone.replace(/\D/g,'');
-    document.getElementById('sm-client-phone').value = digits.length > 10 ? digits.slice(-10) : digits;
+    document.getElementById('sm-client-phone').value = digits.length === 11 && digits.startsWith('1') ? digits.slice(1) : digits;
+    document.getElementById('sm-client-cc').value = '+1';
   }
   document.getElementById('sm-suggestions').style.display = 'none';
 }
@@ -3170,7 +3173,8 @@ async function submitSchedModal() {
   const clientName  = document.getElementById('sm-client-name').value.trim();
   const clientEmail = document.getElementById('sm-client-email').value.trim();
   const rawPhone    = document.getElementById('sm-client-phone').value.trim();
-  const clientPhone = normalizePhone(rawPhone);
+  const cc          = (document.getElementById('sm-client-cc')?.value || '+1').replace('-CA', '');
+  const clientPhone = rawPhone ? normalizePhone(cc + rawPhone.replace(/\D/g, '')) : '';
   const date        = document.getElementById('sm-date').value;
   const time        = document.getElementById('sm-time').value;
   const durationMins = parseInt(document.getElementById('sm-duration').value) || 60;
