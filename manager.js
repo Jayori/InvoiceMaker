@@ -283,7 +283,7 @@ async function loadInvoices() {
 
     tbody.innerHTML = invoices.map(inv => `
       <tr onclick="previewInvoice('${inv.id}')" style="cursor:pointer;" title="Click to preview">
-        <td><div class="client-name" style="cursor:pointer;text-decoration:underline;text-underline-offset:2px;text-decoration-color:var(--gray-300);" onclick="event.stopPropagation();openClientModalByEmail('${escAttr(inv.client_name)}','${escAttr(inv.client_email||'')}')" title="View client">${esc(inv.client_name)}</div><div class="invoice-num">${esc(inv.client_email)}</div></td>
+        <td><div class="client-name" style="cursor:pointer;text-decoration:underline;text-underline-offset:2px;text-decoration-color:var(--gray-300);" onclick="event.stopPropagation();openClientModalByEmail('${escAttr(inv.client_name)}','${escAttr(inv.client_email||'')}')" title="View client">${esc(inv.client_name)}${(inv.co_clients||[]).length ? `<span style="font-size:11px;color:var(--gray-400);margin-left:4px;">+${inv.co_clients.length} other${inv.co_clients.length>1?'s':''}</span>` : ''}</div><div class="invoice-num">${esc(inv.client_email)}</div></td>
         <td>${esc(inv.invoice_number)}</td>
         <td onclick="event.stopPropagation();copyCode('${escAttr(inv.passcode||'')}',this)" title="Click to copy" style="cursor:pointer;"><code style="font-size:13px;letter-spacing:0.1em;background:var(--gray-100);padding:2px 6px;border-radius:4px;">${esc(inv.passcode || '—')}</code></td>
         <td>${formatDate(inv.created_at)}</td>
@@ -421,12 +421,27 @@ function toggleTax() {
 
 let _coClients = [];
 
+function _syncCoClients() {
+  // Read current DOM values back into _coClients before any re-render
+  const nameEls  = document.querySelectorAll('#co-clients-list .co-client-name');
+  const emailEls = document.querySelectorAll('#co-clients-list .co-client-email');
+  _coClients.forEach((c, i) => {
+    c.name  = nameEls[i]  ? nameEls[i].value  : c.name;
+    c.email = emailEls[i] ? emailEls[i].value : c.email;
+  });
+}
+
 function addCoClient() {
+  _syncCoClients();
   _coClients.push({ name: '', email: '' });
   renderCoClients();
+  // Focus the new email field
+  const emails = document.querySelectorAll('#co-clients-list .co-client-email');
+  if (emails.length) emails[emails.length - 1].focus();
 }
 
 function removeCoClient(idx) {
+  _syncCoClients();
   _coClients.splice(idx, 1);
   renderCoClients();
 }
@@ -437,8 +452,8 @@ function renderCoClients() {
   if (!_coClients.length) { container.innerHTML = ''; return; }
   container.innerHTML = _coClients.map((c, i) =>
     `<div style="display:grid;grid-template-columns:1fr 1fr auto;gap:8px;margin-bottom:8px;align-items:center;">
-      <input type="text" placeholder="Name" value="${esc(c.name)}" oninput="_coClients[${i}].name=this.value" style="font-size:14px;">
-      <input type="email" placeholder="Email *" value="${esc(c.email)}" oninput="_coClients[${i}].email=this.value" style="font-size:14px;">
+      <input type="text" class="co-client-name" placeholder="Name" value="${esc(c.name)}" style="font-size:14px;">
+      <input type="email" class="co-client-email" placeholder="Email *" value="${esc(c.email)}" style="font-size:14px;">
       <button type="button" onclick="removeCoClient(${i})" style="background:var(--gray-100);border:none;cursor:pointer;width:34px;height:38px;border-radius:6px;font-size:14px;color:var(--gray-500);">✕</button>
     </div>`
   ).join('');
@@ -458,6 +473,7 @@ async function submitInvoice(e) {
 
   const receiptPhotos = await collectPhotos('invoice-photos');
 
+  _syncCoClients();
   const coClients = _coClients.filter(c => c.email.trim()).map(c => ({ name: c.name.trim(), email: c.email.trim().toLowerCase() }));
 
   const payload = {
@@ -1242,6 +1258,21 @@ function previewInvoice(id) {
     ? `<div class="inv-totals-row"><span>Tax (${inv.tax_rate}%)</span><span>$${Number(inv.tax_amount).toFixed(2)}</span></div>`
     : '';
 
+  // Co-clients
+  const coClientsHtml = (inv.co_clients || []).length
+    ? `<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--gray-100);">
+        <div class="inv-label" style="margin-bottom:6px;">Also Billed To</div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px;">
+          ${(inv.co_clients || []).map(cc =>
+            `<span style="display:inline-flex;align-items:center;gap:4px;padding:4px 10px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:99px;font-size:13px;color:#1e40af;">
+              <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+              ${esc(cc.name || cc.email)}
+            </span>`
+          ).join('')}
+        </div>
+       </div>`
+    : '';
+
   // Notes
   const notesHtml = inv.notes
     ? `<div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--gray-100);">
@@ -1271,6 +1302,7 @@ function previewInvoice(id) {
       <div><span class="inv-label">Billed To</span><span class="inv-val">${esc(inv.client_name)}</span></div>
       <div><span class="inv-label">Due Date</span><span class="inv-val">${dueStr}</span></div>
     </div>
+    ${coClientsHtml}
     <table class="inv-items-table" style="margin-top:20px;">
       <thead><tr>
         <th>Description</th>
