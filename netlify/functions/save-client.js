@@ -17,19 +17,31 @@ exports.handler = async (event) => {
     delete rest.passcode;
     result = await supabase.from('clients').update(rest).eq('id', id).select().single();
   } else {
-    // New client — reuse existing invoice/estimate passcode if one exists, else generate
+    // New client — deduplicate by email first to prevent duplicate records
     const normalizedEmail = (rest.email || '').toLowerCase().trim();
-    let existingPasscode = null;
-    if (normalizedEmail) {
-      const { data: inv } = await supabase.from('invoices').select('passcode').eq('client_email', normalizedEmail).not('passcode', 'is', null).order('created_at', { ascending: false }).limit(1).maybeSingle();
-      existingPasscode = inv?.passcode || null;
-      if (!existingPasscode) {
-        const { data: est } = await supabase.from('estimates').select('passcode').eq('client_email', normalizedEmail).not('passcode', 'is', null).order('created_at', { ascending: false }).limit(1).maybeSingle();
-        existingPasscode = est?.passcode || null;
+    rest.email = normalizedEmail;
+
+    const { data: existingByEmail } = await supabase
+      .from('clients').select('id, passcode').eq('email', normalizedEmail).maybeSingle();
+
+    if (existingByEmail) {
+      // Client already exists — update their info but never overwrite passcode
+      delete rest.passcode;
+      result = await supabase.from('clients').update(rest).eq('id', existingByEmail.id).select().single();
+    } else {
+      // Truly new — reuse existing invoice/estimate passcode if one exists, else generate
+      let existingPasscode = null;
+      if (normalizedEmail) {
+        const { data: inv } = await supabase.from('invoices').select('passcode').eq('client_email', normalizedEmail).not('passcode', 'is', null).order('created_at', { ascending: false }).limit(1).maybeSingle();
+        existingPasscode = inv?.passcode || null;
+        if (!existingPasscode) {
+          const { data: est } = await supabase.from('estimates').select('passcode').eq('client_email', normalizedEmail).not('passcode', 'is', null).order('created_at', { ascending: false }).limit(1).maybeSingle();
+          existingPasscode = est?.passcode || null;
+        }
       }
+      rest.passcode = existingPasscode || generatePasscode();
+      result = await supabase.from('clients').insert(rest).select().single();
     }
-    rest.passcode = existingPasscode || generatePasscode();
-    result = await supabase.from('clients').insert(rest).select().single();
   }
 
   if (result.error) return { statusCode: 502, body: JSON.stringify({ error: result.error.message }) };

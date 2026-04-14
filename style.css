@@ -953,3 +953,97 @@ body.has-cdash .client-wrap { display: none !important; }
   .sch-detail-actions { grid-template-columns: 1fr 1fr; }
   .sch-action-split { grid-template-columns: 1fr 1fr; }
 }
+
+/* ═══════════════════════════════════════════════════
+   INVOICE CLIENT CARD UI
+═══════════════════════════════════════════════════ */
+.inv-client-card {
+  background: var(--gray-50);
+  border: 1.5px solid var(--gray-200);
+  border-radius: 10px;
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.inv-client-card.primary-card {
+  background: var(--blue-light);
+  border-color: #bfdbfe;
+}
+.inv-client-card .cc-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  font-weight: 700;
+  flex-shrink: 0;
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+.inv-client-card .cc-info { flex: 1; min-width: 0; }
+.inv-client-card .cc-name { font-weight: 600; font-size: 15px; color: var(--gray-900); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.inv-client-card .cc-sub { font-size: 12px; color: var(--gray-500); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.inv-client-card .cc-remove {
+  background: var(--gray-100);
+  border: none;
+  cursor: pointer;
+  width: 30px;
+  height: 30px;
+  border-radius: 6px;
+  font-size: 14px;
+  color: var(--gray-500);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: background 0.15s, color 0.15s;
+}
+.inv-client-card .cc-remove:hover { background: #fee2e2; color: var(--red); }
+.inv-add-co-btn {
+  width: 100%;
+  border: 2px dashed var(--gray-200);
+  background: transparent;
+  border-radius: 10px;
+  padding: 12px;
+  cursor: pointer;
+  transition: all 0.15s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: var(--gray-400);
+  font-size: 14px;
+  font-weight: 500;
+  margin-top: 4px;
+}
+.inv-add-co-btn:hover {
+  border-color: var(--blue);
+  color: var(--blue);
+  background: var(--blue-light);
+}
+.inv-client-input-form {
+  background: var(--gray-50);
+  border: 1.5px solid var(--gray-200);
+  border-radius: 10px;
+  padding: 14px 16px;
+  margin-bottom: 10px;
+}
+.inv-selector-or {
+  text-align: center;
+  color: var(--gray-400);
+  font-size: 12px;
+  margin: 10px 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.inv-selector-or::before, .inv-selector-or::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--gray-200);
+}

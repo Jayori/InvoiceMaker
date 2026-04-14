@@ -348,83 +348,12 @@
             <!-- Client -->
             <div class="card">
               <div class="card-title">Client</div>
-              <div class="form-grid">
-                <div class="form-group full">
-                  <label for="client-select">Saved Clients</label>
-                  <select id="client-select" onchange="fillClient(this.value)">
-                    <option value="">— Select a saved client or fill in below —</option>
-                  </select>
-                </div>
-                <div class="form-group">
-                  <label for="client-name">Client Name *</label>
-                  <input type="text" id="client-name" placeholder="Jane Smith" required>
-                </div>
-                <div class="form-group">
-                  <label for="client-email">Client Email *</label>
-                  <input type="email" id="client-email" placeholder="jane@example.com" required>
-                </div>
-                <div class="form-group">
-                  <label for="client-phone">Client Phone</label>
-                  <div style="display:flex;gap:6px;">
-                    <select id="client-phone-cc" style="width:90px;flex-shrink:0;">
-                      <option value="+1">🇺🇸 +1</option>
-                      <option value="+1-CA">🇨🇦 +1</option>
-                      <option value="+44">🇬🇧 +44</option>
-                      <option value="+52">🇲🇽 +52</option>
-                      <option value="+61">🇦🇺 +61</option>
-                      <option value="+91">🇮🇳 +91</option>
-                      <option value="+49">🇩🇪 +49</option>
-                      <option value="+33">🇫🇷 +33</option>
-                      <option value="+55">🇧🇷 +55</option>
-                      <option value="+34">🇪🇸 +34</option>
-                      <option value="+39">🇮🇹 +39</option>
-                      <option value="+81">🇯🇵 +81</option>
-                      <option value="+86">🇨🇳 +86</option>
-                    </select>
-                    <input type="text" id="client-phone" placeholder="(555) 000-0000" style="flex:1;">
-                  </div>
-                </div>
-                <div class="form-group">
-                  <label for="client-company">Company</label>
-                  <input type="text" id="client-company" placeholder="Acme Inc.">
-                </div>
-                <div class="form-group full">
-                  <label for="client-address">Street Address</label>
-                  <input type="text" id="client-address" placeholder="123 Main St">
-                </div>
-                <div class="form-group">
-                  <label for="client-city">City</label>
-                  <input type="text" id="client-city" placeholder="City">
-                </div>
-                <div class="form-group" style="display:flex;gap:8px;">
-                  <div style="flex:1;">
-                    <label style="font-size:13px;font-weight:500;color:var(--gray-700);display:block;margin-bottom:6px;">State</label>
-                    <input type="text" id="client-state" placeholder="ST" style="width:100%;">
-                  </div>
-                  <div style="flex:1;">
-                    <label style="font-size:13px;font-weight:500;color:var(--gray-700);display:block;margin-bottom:6px;">ZIP</label>
-                    <input type="text" id="client-zip" placeholder="12345" style="width:100%;">
-                  </div>
-                </div>
-                <div class="form-group">
-                  <label for="due-date">Due Date</label>
-                  <input type="date" id="due-date">
-                </div>
-                <div class="form-group">
-                  <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
-                    <input type="checkbox" id="save-client-check" checked> Save this client for future invoices
-                  </label>
-                </div>
+              <div id="inv-client-section">
+                <!-- Rendered by renderInvClientSection() -->
               </div>
-
-              <!-- Additional Clients -->
-              <div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--gray-100);">
-                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
-                  <div style="font-size:12px;font-weight:700;color:var(--gray-500);text-transform:uppercase;letter-spacing:0.05em;">Additional Clients</div>
-                  <button type="button" onclick="addCoClient()" class="btn btn-sm btn-secondary" style="font-size:12px;padding:4px 10px;">+ Add Client</button>
-                </div>
-                <p style="font-size:12px;color:var(--gray-400);margin:0 0 10px;">Each client gets their own access code. When any client pays, the invoice is marked paid for everyone.</p>
-                <div id="co-clients-list"></div>
+              <div class="form-group" style="margin-top:16px;">
+                <label for="due-date">Due Date</label>
+                <input type="date" id="due-date">
               </div>
             </div>
 
@@ -819,11 +748,6 @@
                     <label style="font-size:13px;font-weight:500;color:var(--gray-700);display:block;margin-bottom:6px;">ZIP</label>
                     <input type="text" id="est-client-zip" placeholder="12345" style="width:100%;">
                   </div>
-                </div>
-                <div class="form-group full">
-                  <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
-                    <input type="checkbox" id="est-save-client-check" checked> Save this client for future estimates &amp; invoices
-                  </label>
                 </div>
               </div>
             </div>

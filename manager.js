@@ -76,22 +76,15 @@ function handleSchedulerPrefill() {
   setTimeout(() => {
     showTab(tab);
     if (tab === 'new-invoice') {
-      const setField = (id, val) => { const el = document.getElementById(id); if (el && val) el.value = val; };
-      setField('inv-client-name', clientName);
-      setField('inv-client-email', clientEmail);
-      setField('inv-client-phone', clientPhone);
+      // Set primary client from URL params
+      if (clientName && clientEmail) {
+        _primaryClient = { name: clientName, email: clientEmail.toLowerCase(), phone: clientPhone || '', company: '', address: '', city: '', state: '', zip: '' };
+        _addingCoClient = false;
+        renderInvClientSection();
+      }
       // Pre-fill service call as first line item if present
       if (scAmount) {
-        const itemsWrap = document.getElementById('inv-items');
-        if (itemsWrap) {
-          const rows = itemsWrap.querySelectorAll('.item-row');
-          if (rows.length > 0) {
-            rows[0].querySelector('.item-desc')?.setAttribute('value', scDesc);
-            const descEl = rows[0].querySelector('.item-desc'); if (descEl) descEl.value = scDesc;
-            const priceEl = rows[0].querySelector('.item-price'); if (priceEl) priceEl.value = scAmount;
-            const qtyEl = rows[0].querySelector('.item-qty'); if (qtyEl) qtyEl.value = '1';
-          }
-        }
+        addItem(scDesc, 'service', 1, scAmount);
       }
     } else if (tab === 'new-estimate') {
       const setField = (id, val) => { const el = document.getElementById(id); if (el && val) el.value = val; };
@@ -132,6 +125,7 @@ function showTab(name, link) {
   allNav.forEach(a => { if (a.getAttribute('onclick')?.includes(`'${name}'`)) a.classList.add('active'); });
   if (name === 'dashboard') { loadInvoices(); loadEstimates(); }
   if (name === 'clients') loadClients();
+  if (name === 'new-invoice') renderInvClientSection();
   if (name === 'schedule') loadSchedule();
   if (name === 'settings') { loadBusinessProfiles(); loadGcalStatus(); handleGcalRedirect(); }
   if (name === 'analytics') buildAnalytics();
@@ -417,46 +411,195 @@ function toggleTax() {
 
 // ─── Submit invoice ────────────────────────────────────────────────────────────
 
-// ─── Co-clients ───────────────────────────────────────────────────────────────
+// ─── Invoice client card UI ────────────────────────────────────────────────────
 
-let _coClients = [];
+let _primaryClient = null;  // { name, email, phone, company, address, city, state, zip }
+let _coClients = [];        // [{ name, email, phone }]
+let _addingCoClient = false;
 
-function _syncCoClients() {
-  // Read current DOM values back into _coClients before any re-render
-  const nameEls  = document.querySelectorAll('#co-clients-list .co-client-name');
-  const emailEls = document.querySelectorAll('#co-clients-list .co-client-email');
-  _coClients.forEach((c, i) => {
-    c.name  = nameEls[i]  ? nameEls[i].value  : c.name;
-    c.email = emailEls[i] ? emailEls[i].value : c.email;
-  });
+function renderInvClientSection() {
+  const sec = document.getElementById('inv-client-section');
+  if (!sec) return;
+  sec.innerHTML = _primaryClient ? _buildInvClientCards() : _buildInvClientSelector();
 }
 
-function addCoClient() {
-  _syncCoClients();
-  _coClients.push({ name: '', email: '' });
-  renderCoClients();
-  // Focus the new email field
-  const emails = document.querySelectorAll('#co-clients-list .co-client-email');
-  if (emails.length) emails[emails.length - 1].focus();
-}
-
-function removeCoClient(idx) {
-  _syncCoClients();
-  _coClients.splice(idx, 1);
-  renderCoClients();
-}
-
-function renderCoClients() {
-  const container = document.getElementById('co-clients-list');
-  if (!container) return;
-  if (!_coClients.length) { container.innerHTML = ''; return; }
-  container.innerHTML = _coClients.map((c, i) =>
-    `<div style="display:grid;grid-template-columns:1fr 1fr auto;gap:8px;margin-bottom:8px;align-items:center;">
-      <input type="text" class="co-client-name" placeholder="Name" value="${esc(c.name)}" style="font-size:14px;">
-      <input type="email" class="co-client-email" placeholder="Email *" value="${esc(c.email)}" style="font-size:14px;">
-      <button type="button" onclick="removeCoClient(${i})" style="background:var(--gray-100);border:none;cursor:pointer;width:34px;height:38px;border-radius:6px;font-size:14px;color:var(--gray-500);">✕</button>
-    </div>`
+function _buildInvClientSelector() {
+  const options = clientsCache.map(c =>
+    '<option value="' + escAttr(c.email) + '">' + esc(c.name) + (c.company ? ' (' + esc(c.company) + ')' : '') + (c.email ? ' \u2014 ' + esc(c.email) : '') + '</option>'
   ).join('');
+  return (
+    '<div style="margin-bottom:12px;">' +
+      '<label style="font-size:13px;font-weight:500;color:var(--gray-700);display:block;margin-bottom:6px;">Saved Client</label>' +
+      '<select onchange="invPickSavedClient(this.value)" style="width:100%;">' +
+        '<option value="">— Select a saved client —</option>' + options +
+      '</select>' +
+    '</div>' +
+    '<div class="inv-selector-or">or enter new client</div>' +
+    '<div class="inv-client-input-form">' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">' +
+        '<input type="text" id="inv-nc-name" placeholder="Name *" style="font-size:14px;">' +
+        '<input type="email" id="inv-nc-email" placeholder="Email *" style="font-size:14px;">' +
+        '<input type="text" id="inv-nc-phone" placeholder="Phone" style="font-size:14px;">' +
+        '<input type="text" id="inv-nc-company" placeholder="Company" style="font-size:14px;">' +
+      '</div>' +
+      '<div id="inv-nc-addr-wrap" style="display:none;margin-bottom:8px;">' +
+        '<input type="text" id="inv-nc-address" placeholder="Street Address" style="font-size:14px;width:100%;margin-bottom:6px;">' +
+        '<div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:8px;">' +
+          '<input type="text" id="inv-nc-city" placeholder="City" style="font-size:14px;">' +
+          '<input type="text" id="inv-nc-state" placeholder="ST" style="font-size:14px;">' +
+          '<input type="text" id="inv-nc-zip" placeholder="ZIP" style="font-size:14px;">' +
+        '</div>' +
+      '</div>' +
+      '<div style="display:flex;gap:8px;align-items:center;">' +
+        '<button type="button" onclick="invConfirmNewClient()" class="btn btn-primary" style="flex:1;justify-content:center;">Confirm Client</button>' +
+        '<button type="button" onclick="invToggleAddr()" id="inv-addr-toggle" style="background:none;border:none;color:var(--gray-400);cursor:pointer;font-size:13px;white-space:nowrap;">+ Address</button>' +
+      '</div>' +
+    '</div>'
+  );
+}
+
+function _buildInvClientCards() {
+  const c = _primaryClient;
+  const initials = (c.name || '?').split(' ').map(function(w){return w[0]||'';}).join('').toUpperCase().slice(0, 2) || '?';
+  const subLine = [c.email, c.phone, c.company].filter(Boolean).join(' \u00b7 ');
+
+  let coHtml = _coClients.map(function(cc, i) {
+    const ccInit = (cc.name || cc.email || '?').split(' ').map(function(w){return w[0]||'';}).join('').toUpperCase().slice(0, 2) || '?';
+    const ccSub = [cc.email, cc.phone].filter(Boolean).join(' \u00b7 ');
+    return (
+      '<div class="inv-client-card">' +
+        '<div class="cc-avatar" style="background:#d1fae5;color:#065f46;">' + ccInit + '</div>' +
+        '<div class="cc-info">' +
+          '<div class="cc-name">' + esc(cc.name || cc.email) + '</div>' +
+          '<div class="cc-sub">' + esc(ccSub) + '</div>' +
+        '</div>' +
+        '<button type="button" class="cc-remove" onclick="invRemoveCoClient(' + i + ')" title="Remove">&#x2715;</button>' +
+      '</div>'
+    );
+  }).join('');
+
+  let addCoHtml = '';
+  if (_addingCoClient) {
+    const savedOpts = clientsCache
+      .filter(function(sc){ return sc.email !== c.email && !_coClients.some(function(cc){return cc.email === sc.email;}); })
+      .map(function(sc){ return '<option value="' + escAttr(sc.email) + '">' + esc(sc.name) + (sc.email ? ' \u2014 ' + esc(sc.email) : '') + '</option>'; })
+      .join('');
+    addCoHtml = (
+      '<div class="inv-client-input-form" id="inv-co-input">' +
+        '<div style="font-size:12px;font-weight:600;color:var(--gray-500);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:10px;">Add Co-Client</div>' +
+        (savedOpts
+          ? '<select onchange="invPickSavedCoClient(this.value)" style="width:100%;margin-bottom:10px;">' +
+              '<option value="">— Select saved client —</option>' + savedOpts +
+            '</select>' +
+            '<div class="inv-selector-or">or type below</div>'
+          : '') +
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">' +
+          '<input type="text" id="inv-cc-name" placeholder="Name" style="font-size:14px;">' +
+          '<input type="email" id="inv-cc-email" placeholder="Email *" style="font-size:14px;">' +
+        '</div>' +
+        '<div style="display:flex;gap:8px;">' +
+          '<button type="button" onclick="invConfirmCoClient()" class="btn btn-primary" style="flex:1;justify-content:center;font-size:13px;padding:8px;">Confirm</button>' +
+          '<button type="button" onclick="invCancelCoClient()" style="background:var(--gray-100);border:none;border-radius:6px;cursor:pointer;padding:8px 14px;font-size:13px;color:var(--gray-700);">Cancel</button>' +
+        '</div>' +
+      '</div>'
+    );
+  } else {
+    addCoHtml = '<button type="button" class="inv-add-co-btn" onclick="invStartAddCoClient()"><span style="font-size:20px;line-height:1;">+</span><span>Add Co-Client</span></button>';
+  }
+
+  return (
+    '<div class="inv-client-card primary-card">' +
+      '<div class="cc-avatar">' + initials + '</div>' +
+      '<div class="cc-info">' +
+        '<div class="cc-name">' + esc(c.name) + '</div>' +
+        '<div class="cc-sub">' + esc(subLine) + '</div>' +
+      '</div>' +
+      '<button type="button" class="cc-remove" onclick="invRemovePrimaryClient()" title="Change client">&#x2715;</button>' +
+    '</div>' +
+    coHtml +
+    addCoHtml
+  );
+}
+
+function invPickSavedClient(email) {
+  if (!email) return;
+  const c = clientsCache.find(function(cl){ return cl.email === email; });
+  if (!c) return;
+  _primaryClient = { name: c.name || '', email: c.email || '', phone: c.phone || '', company: c.company || '', address: c.address || '', city: c.city || '', state: c.state || '', zip: c.zip || '' };
+  _addingCoClient = false;
+  renderInvClientSection();
+}
+
+function invConfirmNewClient() {
+  const name = (document.getElementById('inv-nc-name') || {}).value || '';
+  const email = (document.getElementById('inv-nc-email') || {}).value || '';
+  if (!name.trim() || !email.trim()) { showToast('Name and email are required.', 'error'); return; }
+  _primaryClient = {
+    name: name.trim(),
+    email: email.trim().toLowerCase(),
+    phone: ((document.getElementById('inv-nc-phone') || {}).value || '').trim(),
+    company: ((document.getElementById('inv-nc-company') || {}).value || '').trim(),
+    address: ((document.getElementById('inv-nc-address') || {}).value || '').trim(),
+    city: ((document.getElementById('inv-nc-city') || {}).value || '').trim(),
+    state: ((document.getElementById('inv-nc-state') || {}).value || '').trim(),
+    zip: ((document.getElementById('inv-nc-zip') || {}).value || '').trim(),
+  };
+  _addingCoClient = false;
+  renderInvClientSection();
+}
+
+function invToggleAddr() {
+  const wrap = document.getElementById('inv-nc-addr-wrap');
+  const btn = document.getElementById('inv-addr-toggle');
+  if (!wrap) return;
+  const shown = wrap.style.display !== 'none';
+  wrap.style.display = shown ? 'none' : '';
+  if (btn) btn.textContent = shown ? '+ Address' : '\u2212 Address';
+}
+
+function invRemovePrimaryClient() {
+  _primaryClient = null;
+  _coClients = [];
+  _addingCoClient = false;
+  renderInvClientSection();
+}
+
+function invStartAddCoClient() {
+  _addingCoClient = true;
+  renderInvClientSection();
+  setTimeout(function() {
+    const el = document.getElementById('inv-cc-email');
+    if (el) el.focus();
+  }, 50);
+}
+
+function invCancelCoClient() {
+  _addingCoClient = false;
+  renderInvClientSection();
+}
+
+function invPickSavedCoClient(email) {
+  if (!email) return;
+  const c = clientsCache.find(function(cl){ return cl.email === email; });
+  if (!c) return;
+  _coClients.push({ name: c.name || '', email: c.email || '', phone: c.phone || '' });
+  _addingCoClient = false;
+  renderInvClientSection();
+}
+
+function invConfirmCoClient() {
+  const name = ((document.getElementById('inv-cc-name') || {}).value || '').trim();
+  const email = ((document.getElementById('inv-cc-email') || {}).value || '').trim();
+  if (!email) { showToast('Email is required for co-client.', 'error'); return; }
+  _coClients.push({ name: name, email: email.toLowerCase(), phone: '' });
+  _addingCoClient = false;
+  renderInvClientSection();
+}
+
+function invRemoveCoClient(idx) {
+  _coClients.splice(idx, 1);
+  _addingCoClient = false;
+  renderInvClientSection();
 }
 
 // ─── Submit invoice ────────────────────────────────────────────────────────────
@@ -468,24 +611,27 @@ async function submitInvoice(e) {
     showToast('Please complete all line items.', 'error'); return;
   }
 
+  if (!_primaryClient) {
+    showToast('Please select or confirm a client first.', 'error'); return;
+  }
+
   const useTax = document.getElementById('tax-toggle').checked;
   const taxRate = useTax ? (parseFloat(document.getElementById('tax-rate').value) || 0) : 0;
 
   const receiptPhotos = await collectPhotos('invoice-photos');
 
-  _syncCoClients();
-  const coClients = _coClients.filter(c => c.email.trim()).map(c => ({ name: c.name.trim(), email: c.email.trim().toLowerCase() }));
+  const coClients = _coClients.filter(function(c){ return c.email; }).map(function(c){ return { name: c.name, email: c.email }; });
 
   const payload = {
-    clientName: document.getElementById('client-name').value.trim(),
-    clientEmail: document.getElementById('client-email').value.trim(),
+    clientName: _primaryClient.name,
+    clientEmail: _primaryClient.email,
     businessProfileId: document.getElementById('inv-business-select').value || null,
-    clientPhone: buildPhone('client-phone-cc', 'client-phone'),
-    clientCompany: document.getElementById('client-company').value.trim(),
-    clientAddress: document.getElementById('client-address').value.trim(),
-    clientCity: document.getElementById('client-city').value.trim(),
-    clientState: document.getElementById('client-state').value.trim(),
-    clientZip: document.getElementById('client-zip').value.trim(),
+    clientPhone: normalizePhone(_primaryClient.phone),
+    clientCompany: _primaryClient.company || '',
+    clientAddress: _primaryClient.address || '',
+    clientCity: _primaryClient.city || '',
+    clientState: _primaryClient.state || '',
+    clientZip: _primaryClient.zip || '',
     items,
     taxRate,
     notes: document.getElementById('notes').value.trim(),
@@ -496,15 +642,6 @@ async function submitInvoice(e) {
     coClients: coClients.length ? coClients : undefined,
     ...getInvSchedData(),
   };
-
-  // Optionally save client
-  if (document.getElementById('save-client-check').checked) {
-    fetch('/api/save-client', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: payload.clientName, email: payload.clientEmail, phone: payload.clientPhone, company: payload.clientCompany, address: payload.clientAddress, city: payload.clientCity, state: payload.clientState, zip: payload.clientZip }),
-    }).then(() => loadClients()).catch(() => {});
-  }
 
   const btn = document.getElementById('submit-btn');
   btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Sending...';
@@ -538,12 +675,12 @@ function resetInvoiceForm() {
   document.getElementById('tax-row').style.display = 'none';
   const photoPreview = document.getElementById('invoice-photo-preview');
   if (photoPreview) photoPreview.innerHTML = '';
-  ['client-name','client-email','client-phone','client-company','client-address','client-city','client-state','client-zip','notes'].forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.value = '';
-  });
+  const notesEl = document.getElementById('notes');
+  if (notesEl) notesEl.value = '';
+  _primaryClient = null;
   _coClients = [];
-  renderCoClients();
+  _addingCoClient = false;
+  renderInvClientSection();
   recalcTotals();
 }
 
@@ -776,7 +913,13 @@ function cmInvoice() {
   const c = activeClientId ? clientsCache.find(x => x.id === activeClientId) : null;
   closeClientModal();
   showTab('new-invoice');
-  if (c) setTimeout(() => fillClient(c.id), 50);
+  if (c) {
+    setTimeout(function() {
+      _primaryClient = { name: c.name || '', email: c.email || '', phone: c.phone || '', company: c.company || '', address: c.address || '', city: c.city || '', state: c.state || '', zip: c.zip || '' };
+      _addingCoClient = false;
+      renderInvClientSection();
+    }, 50);
+  }
 }
 
 function cmViewProfile() {
@@ -912,12 +1055,8 @@ async function loadClients() {
     const res = await fetch('/api/get-clients');
     clientsCache = await res.json();
 
-    // Populate client dropdowns
-    const sel = document.getElementById('client-select');
-    if (sel) {
-      sel.innerHTML = '<option value="">— Select a saved client or fill in below —</option>' +
-        clientsCache.map(c => `<option value="${c.id}">${esc(c.name)}${c.company ? ` (${esc(c.company)})` : ''}</option>`).join('');
-    }
+    // Refresh invoice client selector (only if no client is currently selected)
+    if (!_primaryClient) renderInvClientSection();
     populateEstimateClientDropdown();
 
     if (loading) loading.style.display = 'none';
@@ -1039,16 +1178,12 @@ async function mergeAllDuplicates() {
 }
 
 function fillClient(id) {
+  // Legacy: populate invoice client card from a client ID
   const c = clientsCache.find(x => x.id === id);
   if (!c) return;
-  document.getElementById('client-name').value = c.name || '';
-  document.getElementById('client-email').value = c.email || '';
-  document.getElementById('client-phone').value = c.phone || '';
-  document.getElementById('client-company').value = c.company || '';
-  document.getElementById('client-address').value = c.address || '';
-  document.getElementById('client-city').value = c.city || '';
-  document.getElementById('client-state').value = c.state || '';
-  document.getElementById('client-zip').value = c.zip || '';
+  _primaryClient = { name: c.name || '', email: c.email || '', phone: c.phone || '', company: c.company || '', address: c.address || '', city: c.city || '', state: c.state || '', zip: c.zip || '' };
+  _addingCoClient = false;
+  renderInvClientSection();
 }
 
 function fillEstimateClient(id) {
@@ -1951,14 +2086,6 @@ async function submitEstimate(e) {
     depositAmount: parseFloat(document.getElementById('est-deposit').value) || null,
     ...getEstSchedData(),
   };
-
-  if (document.getElementById('est-save-client-check').checked) {
-    fetch('/api/save-client', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: payload.clientName, email: payload.clientEmail, phone: payload.clientPhone, company: payload.clientCompany, address: payload.clientAddress, city: payload.clientCity, state: payload.clientState, zip: payload.clientZip }),
-    }).then(() => loadClients()).catch(() => {});
-  }
 
   const btn = document.getElementById('est-submit-btn');
   btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Sending...';
