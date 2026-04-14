@@ -49,3 +49,7 @@ alter table scheduled_events
   add column if not exists reminder_24_sent boolean default false;
 alter table scheduled_events
   add column if not exists reminder_48_sent boolean default false;
+
+-- Multi-client invoices: array of {name, email, passcode} objects
+alter table invoices
+  add column if not exists co_clients jsonb default '[]'::jsonb;

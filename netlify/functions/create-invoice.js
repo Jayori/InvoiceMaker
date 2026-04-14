@@ -178,7 +178,7 @@ exports.handler = async (event) => {
   let body;
   try { body = JSON.parse(event.body); } catch { return { statusCode: 400, body: JSON.stringify({ error: 'Invalid JSON' }) }; }
 
-  const { clientName, clientEmail, clientPhone, clientCompany, clientAddress, clientCity, clientState, clientZip, items, taxRate = 0, notes, dueDate, sendEmail = true, sendSmsNotification, receiptPhotos, businessProfileId, scheduledAt, scheduledDuration } = body;
+  const { clientName, clientEmail, clientPhone, clientCompany, clientAddress, clientCity, clientState, clientZip, items, taxRate = 0, notes, dueDate, sendEmail = true, sendSmsNotification, receiptPhotos, businessProfileId, scheduledAt, scheduledDuration, coClients } = body;
   if (!clientName || !clientEmail || !items?.length) {
     return { statusCode: 400, body: JSON.stringify({ error: 'clientName, clientEmail, and at least one item are required' }) };
   }
@@ -228,7 +228,7 @@ exports.handler = async (event) => {
     // Fully covered — save as paid immediately, no Square link needed
     const { data: invoice, error: dbError } = await supabase
       .from('invoices')
-      .insert({ invoice_number: invoiceNumber, passcode, client_name: clientName, client_email: clientEmail, client_phone: clientPhone || null, client_company: clientCompany || null, client_address: clientAddress || null, client_city: clientCity || null, client_state: clientState || null, client_zip: clientZip || null, items, subtotal, tax_rate: taxRate, tax_amount: taxAmount, total: 0, notes: notes || null, due_date: dueDate || null, square_payment_link: null, square_order_id: null, receipt_photos: receiptPhotos?.length ? receiptPhotos : null, business_profile_id: businessProfileId || null, status: 'paid', paid_at: new Date().toISOString() })
+      .insert({ invoice_number: invoiceNumber, passcode, client_name: clientName, client_email: clientEmail, client_phone: clientPhone || null, client_company: clientCompany || null, client_address: clientAddress || null, client_city: clientCity || null, client_state: clientState || null, client_zip: clientZip || null, items, subtotal, tax_rate: taxRate, tax_amount: taxAmount, total: 0, notes: notes || null, due_date: dueDate || null, square_payment_link: null, square_order_id: null, receipt_photos: receiptPhotos?.length ? receiptPhotos : null, business_profile_id: businessProfileId || null, status: 'paid', paid_at: new Date().toISOString(), co_clients: coClients?.length ? coClients : [] })
       .select().single();
     if (dbError) return { statusCode: 502, body: JSON.stringify({ error: 'Failed to save invoice', detail: dbError.message }) };
     return { statusCode: 200, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(invoice) };
@@ -262,10 +262,30 @@ exports.handler = async (event) => {
     return { statusCode: 502, body: JSON.stringify({ error: 'Square error', detail }) };
   }
 
+  // Resolve passcodes for co-clients (look up or create their client records)
+  const resolvedCoClients = [];
+  for (const cc of (coClients || [])) {
+    if (!cc.email) continue;
+    const ccEmail = cc.email.toLowerCase().trim();
+    const { data: ccClient } = await supabase.from('clients').select('id, passcode').eq('email', ccEmail).maybeSingle();
+    let ccPasscode;
+    if (ccClient?.passcode) {
+      ccPasscode = ccClient.passcode;
+    } else {
+      ccPasscode = generatePasscode();
+      if (ccClient) {
+        await supabase.from('clients').update({ passcode: ccPasscode }).eq('id', ccClient.id);
+      } else {
+        await supabase.from('clients').insert({ name: cc.name || ccEmail, email: ccEmail, passcode: ccPasscode });
+      }
+    }
+    resolvedCoClients.push({ name: cc.name || '', email: ccEmail, passcode: ccPasscode });
+  }
+
   // Save to Supabase
   const { data: invoice, error: dbError } = await supabase
     .from('invoices')
-    .insert({ invoice_number: invoiceNumber, passcode, client_name: clientName, client_email: clientEmail, client_phone: clientPhone || null, client_company: clientCompany || null, client_address: clientAddress || null, client_city: clientCity || null, client_state: clientState || null, client_zip: clientZip || null, items, subtotal, tax_rate: taxRate, tax_amount: taxAmount, total, notes: notes || null, due_date: dueDate || null, square_payment_link: squarePaymentLink, square_order_id: squareOrderId, receipt_photos: receiptPhotos?.length ? receiptPhotos : null, business_profile_id: businessProfileId || null, scheduled_at: scheduledAt || null, scheduled_duration: scheduledDuration || null })
+    .insert({ invoice_number: invoiceNumber, passcode, client_name: clientName, client_email: clientEmail, client_phone: clientPhone || null, client_company: clientCompany || null, client_address: clientAddress || null, client_city: clientCity || null, client_state: clientState || null, client_zip: clientZip || null, items, subtotal, tax_rate: taxRate, tax_amount: taxAmount, total, notes: notes || null, due_date: dueDate || null, square_payment_link: squarePaymentLink, square_order_id: squareOrderId, receipt_photos: receiptPhotos?.length ? receiptPhotos : null, business_profile_id: businessProfileId || null, scheduled_at: scheduledAt || null, scheduled_duration: scheduledDuration || null, co_clients: resolvedCoClients.length ? resolvedCoClients : [] })
     .select().single();
 
   if (dbError) return { statusCode: 502, body: JSON.stringify({ error: 'Failed to save invoice', detail: dbError.message }) };
@@ -295,6 +315,20 @@ exports.handler = async (event) => {
         html: buildEmail({ invoiceNumber, passcode, clientName, clientAddress, clientCity, clientState, clientZip, business: business || {}, items, subtotal, taxRate, taxAmount, total, dueDate, notes, paymentLink: squarePaymentLink }),
       });
     } catch (err) { console.error('Resend error:', err); }
+  }
+
+  // Send emails to co-clients (each with their own passcode)
+  if (sendEmail && resolvedCoClients.length) {
+    for (const cc of resolvedCoClients) {
+      try {
+        await resend.emails.send({
+          from: process.env.FROM_EMAIL,
+          to: cc.email,
+          subject: `Invoice from ${business?.name || 'Us'} — $${total.toFixed(2)} due`,
+          html: buildEmail({ invoiceNumber, passcode: cc.passcode, clientName: cc.name || cc.email, clientAddress, clientCity, clientState, clientZip, business: business || {}, items, subtotal, taxRate, taxAmount, total, dueDate, notes, paymentLink: squarePaymentLink }),
+        });
+      } catch (err) { console.error('Co-client email error:', err); }
+    }
   }
 
   // Send SMS if requested and phone provided

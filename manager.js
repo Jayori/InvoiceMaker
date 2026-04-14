@@ -417,6 +417,35 @@ function toggleTax() {
 
 // ─── Submit invoice ────────────────────────────────────────────────────────────
 
+// ─── Co-clients ───────────────────────────────────────────────────────────────
+
+let _coClients = [];
+
+function addCoClient() {
+  _coClients.push({ name: '', email: '' });
+  renderCoClients();
+}
+
+function removeCoClient(idx) {
+  _coClients.splice(idx, 1);
+  renderCoClients();
+}
+
+function renderCoClients() {
+  const container = document.getElementById('co-clients-list');
+  if (!container) return;
+  if (!_coClients.length) { container.innerHTML = ''; return; }
+  container.innerHTML = _coClients.map((c, i) =>
+    `<div style="display:grid;grid-template-columns:1fr 1fr auto;gap:8px;margin-bottom:8px;align-items:center;">
+      <input type="text" placeholder="Name" value="${esc(c.name)}" oninput="_coClients[${i}].name=this.value" style="font-size:14px;">
+      <input type="email" placeholder="Email *" value="${esc(c.email)}" oninput="_coClients[${i}].email=this.value" style="font-size:14px;">
+      <button type="button" onclick="removeCoClient(${i})" style="background:var(--gray-100);border:none;cursor:pointer;width:34px;height:38px;border-radius:6px;font-size:14px;color:var(--gray-500);">✕</button>
+    </div>`
+  ).join('');
+}
+
+// ─── Submit invoice ────────────────────────────────────────────────────────────
+
 async function submitInvoice(e) {
   e.preventDefault();
   const items = getItems();
@@ -428,6 +457,8 @@ async function submitInvoice(e) {
   const taxRate = useTax ? (parseFloat(document.getElementById('tax-rate').value) || 0) : 0;
 
   const receiptPhotos = await collectPhotos('invoice-photos');
+
+  const coClients = _coClients.filter(c => c.email.trim()).map(c => ({ name: c.name.trim(), email: c.email.trim().toLowerCase() }));
 
   const payload = {
     clientName: document.getElementById('client-name').value.trim(),
@@ -446,6 +477,7 @@ async function submitInvoice(e) {
     sendEmail: document.getElementById('inv-send-email').checked,
     sendSmsNotification: document.getElementById('inv-send-sms').checked,
     receiptPhotos,
+    coClients: coClients.length ? coClients : undefined,
     ...getInvSchedData(),
   };
 
@@ -494,6 +526,8 @@ function resetInvoiceForm() {
     const el = document.getElementById(id);
     if (el) el.value = '';
   });
+  _coClients = [];
+  renderCoClients();
   recalcTotals();
 }
 

@@ -16,10 +16,18 @@ exports.handler = async (event) => {
     .maybeSingle();
 
   if (client) {
-    const [invoicesResult, estimatesResult] = await Promise.all([
+    const [invoicesResult, estimatesResult, coClientInvoicesResult] = await Promise.all([
       supabase.from('invoices').select('*').eq('client_email', client.email).order('created_at', { ascending: false }),
       supabase.from('estimates').select('*').eq('client_email', client.email).order('created_at', { ascending: false }),
+      supabase.from('invoices').select('*').filter('co_clients', 'cs', JSON.stringify([{ email: client.email }])).order('created_at', { ascending: false }),
     ]);
+
+    // Merge primary + co-client invoices, deduplicated, sorted newest first
+    const primaryIds = new Set((invoicesResult.data || []).map(i => i.id));
+    const allInvoices = [
+      ...(invoicesResult.data || []),
+      ...(coClientInvoicesResult.data || []).filter(i => !primaryIds.has(i.id)),
+    ].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
     const estimates = estimatesResult.data || [];
     let estimatesWithMessages = estimates;
@@ -38,7 +46,7 @@ exports.handler = async (event) => {
     return {
       statusCode: 200,
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ mode: 'profile', client, invoices: invoicesResult.data || [], estimates: estimatesWithMessages }),
+      body: JSON.stringify({ mode: 'profile', client, invoices: allInvoices, estimates: estimatesWithMessages }),
     };
   }
 

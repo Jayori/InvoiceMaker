@@ -416,6 +416,16 @@
                   </label>
                 </div>
               </div>
+
+              <!-- Additional Clients -->
+              <div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--gray-100);">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+                  <div style="font-size:12px;font-weight:700;color:var(--gray-500);text-transform:uppercase;letter-spacing:0.05em;">Additional Clients</div>
+                  <button type="button" onclick="addCoClient()" class="btn btn-sm btn-secondary" style="font-size:12px;padding:4px 10px;">+ Add Client</button>
+                </div>
+                <p style="font-size:12px;color:var(--gray-400);margin:0 0 10px;">Each client gets their own access code. When any client pays, the invoice is marked paid for everyone.</p>
+                <div id="co-clients-list"></div>
+              </div>
             </div>
 
             <!-- Line Items -->
