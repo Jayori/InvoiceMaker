@@ -56,6 +56,10 @@ exports.handler = async (event) => {
         const disc = Math.min(Number(item.discount) || 0, lt);
         const net = lt - disc;
         if (disc > 0) return { name: item.description.substring(0, 100), quantity: '1', basePriceMoney: { amount: BigInt(Math.round(net * 100)), currency: 'USD' } };
+        if (!Number.isInteger(item.quantity)) {
+          const precision = Math.max(1, (String(item.quantity).split('.')[1] || '').length);
+          return { name: item.description.substring(0, 100), quantity: String(item.quantity), basePriceMoney: { amount: BigInt(Math.round(item.unitPrice * 100)), currency: 'USD' }, quantityUnit: { measurementUnit: { customUnit: { name: 'Unit', abbreviation: 'unit' } }, precision } };
+        }
         return { name: item.description.substring(0, 100), quantity: String(item.quantity), basePriceMoney: { amount: BigInt(Math.round(item.unitPrice * 100)), currency: 'USD' } };
       });
       if (taxRate > 0) lineItems.push({ name: `Tax (${taxRate}%)`, quantity: '1', basePriceMoney: { amount: BigInt(Math.round(taxAmount * 100)), currency: 'USD' } });

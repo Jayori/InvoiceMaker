@@ -37,6 +37,10 @@ exports.handler = async (event) => {
       if (disc > 0) {
         return { name: item.description.substring(0, 100), quantity: '1', basePriceMoney: { amount: BigInt(Math.round(netTotal * 100)), currency: 'USD' } };
       }
+      if (!Number.isInteger(item.quantity)) {
+        const precision = Math.max(1, (String(item.quantity).split('.')[1] || '').length);
+        return { name: item.description.substring(0, 100), quantity: String(item.quantity), basePriceMoney: { amount: BigInt(Math.round(item.unitPrice * 100)), currency: 'USD' }, quantityUnit: { measurementUnit: { customUnit: { name: 'Unit', abbreviation: 'unit' } }, precision } };
+      }
       return { name: item.description.substring(0, 100), quantity: String(item.quantity), basePriceMoney: { amount: BigInt(Math.round(item.unitPrice * 100)), currency: 'USD' } };
     }).filter(Boolean);
 
