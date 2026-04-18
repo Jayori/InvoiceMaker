@@ -413,9 +413,10 @@ function toggleTax() {
 
 // ─── Invoice client card UI ────────────────────────────────────────────────────
 
-let _primaryClient = null;  // { name, email, phone, company, address, city, state, zip }
+let _primaryClient = null;  // { name, email, phone, company, address, city, state, zip, addresses }
 let _coClients = [];        // [{ name, email, phone }]
 let _addingCoClient = false;
+let _invAddrIdx = 0;        // index of selected saved address in picker; -1 = new/custom
 
 function renderInvClientSection() {
   const sec = document.getElementById('inv-client-section');
@@ -456,6 +457,52 @@ function _buildInvClientSelector() {
       '</div>' +
     '</div>'
   );
+}
+
+function _getClientAddresses(client) {
+  const saved = Array.isArray(client.addresses) ? client.addresses : [];
+  if (!client.address) return saved;
+  const legacyKey = [client.address, client.city, client.state, client.zip].join('|').toLowerCase();
+  const alreadyIn = saved.some(function(a) { return [a.address, a.city, a.state, a.zip].join('|').toLowerCase() === legacyKey; });
+  return alreadyIn ? saved : [{ address: client.address, city: client.city || '', state: client.state || '', zip: client.zip || '' }].concat(saved);
+}
+
+function invOnAddressSelect(val) {
+  const fields = document.getElementById('inv-addr-fields');
+  if (val === 'new') {
+    _invAddrIdx = -1;
+    if (fields) fields.style.display = '';
+  } else {
+    _invAddrIdx = parseInt(val) || 0;
+    if (fields) fields.style.display = 'none';
+  }
+}
+
+async function _saveClientAddress(email, address, city, state, zip) {
+  try {
+    await fetch('/api/save-client-address', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, address, city, state, zip }),
+    });
+    await loadClients();
+  } catch(e) { /* silent */ }
+}
+
+function estOnAddressSelect(val, client) {
+  const email = ((document.getElementById('est-client-email') || {}).value || '').toLowerCase();
+  const c = client || clientsCache.find(function(x) { return (x.email || '').toLowerCase() === email; });
+  if (val === 'new') {
+    ['est-client-address','est-client-city','est-client-state','est-client-zip'].forEach(function(id) {
+      const el = document.getElementById(id); if (el) el.value = '';
+    });
+  } else if (c) {
+    const a = _getClientAddresses(c)[parseInt(val)] || {};
+    document.getElementById('est-client-address').value = a.address || '';
+    document.getElementById('est-client-city').value = a.city || '';
+    document.getElementById('est-client-state').value = a.state || '';
+    document.getElementById('est-client-zip').value = a.zip || '';
+  }
 }
 
 function _buildInvClientCards() {
@@ -507,6 +554,45 @@ function _buildInvClientCards() {
     addCoHtml = '<button type="button" class="inv-add-co-btn" onclick="invStartAddCoClient()"><span style="font-size:20px;line-height:1;">+</span><span>Add Co-Client</span></button>';
   }
 
+  // Build address picker
+  const allAddrs = _getClientAddresses(c);
+  let addrPickerHtml;
+  if (allAddrs.length > 0) {
+    const opts = allAddrs.map(function(a, i) {
+      const label = [a.address, a.city, a.state, a.zip].filter(Boolean).join(', ');
+      return '<option value="' + i + '"' + (_invAddrIdx === i ? ' selected' : '') + '>' + escAttr(label) + '</option>';
+    }).join('');
+    addrPickerHtml = (
+      '<div class="inv-addr-section">' +
+        '<div class="inv-addr-label">Job Address</div>' +
+        '<select id="inv-addr-select" onchange="invOnAddressSelect(this.value)" style="width:100%;margin-bottom:6px;">' +
+          opts +
+          '<option value="new"' + (_invAddrIdx === -1 ? ' selected' : '') + '>+ Add new address</option>' +
+        '</select>' +
+        '<div id="inv-addr-fields" style="display:' + (_invAddrIdx === -1 ? '' : 'none') + ';margin-top:4px;">' +
+          '<input type="text" id="inv-new-address" placeholder="Street Address" style="width:100%;margin-bottom:6px;font-size:14px;">' +
+          '<div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:6px;">' +
+            '<input type="text" id="inv-new-city" placeholder="City" style="font-size:14px;">' +
+            '<input type="text" id="inv-new-state" placeholder="ST" style="font-size:14px;">' +
+            '<input type="text" id="inv-new-zip" placeholder="ZIP" style="font-size:14px;">' +
+          '</div>' +
+        '</div>' +
+      '</div>'
+    );
+  } else {
+    addrPickerHtml = (
+      '<div class="inv-addr-section">' +
+        '<div class="inv-addr-label">Job Address <span class="inv-addr-opt">(optional)</span></div>' +
+        '<input type="text" id="inv-new-address" value="' + escAttr(c.address || '') + '" placeholder="Street Address" style="width:100%;margin-bottom:6px;font-size:14px;">' +
+        '<div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:6px;">' +
+          '<input type="text" id="inv-new-city" value="' + escAttr(c.city || '') + '" placeholder="City" style="font-size:14px;">' +
+          '<input type="text" id="inv-new-state" value="' + escAttr(c.state || '') + '" placeholder="ST" style="font-size:14px;">' +
+          '<input type="text" id="inv-new-zip" value="' + escAttr(c.zip || '') + '" placeholder="ZIP" style="font-size:14px;">' +
+        '</div>' +
+      '</div>'
+    );
+  }
+
   return (
     '<div class="inv-client-card primary-card">' +
       '<div class="cc-avatar">' + initials + '</div>' +
@@ -517,7 +603,8 @@ function _buildInvClientCards() {
       '<button type="button" class="cc-remove" onclick="invRemovePrimaryClient()" title="Change client">&#x2715;</button>' +
     '</div>' +
     coHtml +
-    addCoHtml
+    addCoHtml +
+    addrPickerHtml
   );
 }
 
@@ -525,7 +612,8 @@ function invPickSavedClient(email) {
   if (!email) return;
   const c = clientsCache.find(function(cl){ return cl.email === email; });
   if (!c) return;
-  _primaryClient = { name: c.name || '', email: c.email || '', phone: c.phone || '', company: c.company || '', address: c.address || '', city: c.city || '', state: c.state || '', zip: c.zip || '' };
+  _primaryClient = { name: c.name || '', email: c.email || '', phone: c.phone || '', company: c.company || '', address: c.address || '', city: c.city || '', state: c.state || '', zip: c.zip || '', addresses: c.addresses || [] };
+  _invAddrIdx = _getClientAddresses(_primaryClient).length > 0 ? 0 : -1;
   _addingCoClient = false;
   renderInvClientSection();
 }
@@ -543,7 +631,9 @@ function invConfirmNewClient() {
     city: ((document.getElementById('inv-nc-city') || {}).value || '').trim(),
     state: ((document.getElementById('inv-nc-state') || {}).value || '').trim(),
     zip: ((document.getElementById('inv-nc-zip') || {}).value || '').trim(),
+    addresses: [],
   };
+  _invAddrIdx = -1;
   _addingCoClient = false;
   renderInvClientSection();
 }
@@ -622,16 +712,29 @@ async function submitInvoice(e) {
 
   const coClients = _coClients.filter(function(c){ return c.email; }).map(function(c){ return { name: c.name, email: c.email }; });
 
+  // Resolve job address from picker
+  const _addrSel = document.getElementById('inv-addr-select');
+  let _jobAddr, _jobCity, _jobState, _jobZip;
+  if (_addrSel && _addrSel.value !== 'new') {
+    const _a = _getClientAddresses(_primaryClient)[parseInt(_addrSel.value)] || {};
+    _jobAddr = _a.address || ''; _jobCity = _a.city || ''; _jobState = _a.state || ''; _jobZip = _a.zip || '';
+  } else {
+    _jobAddr = ((document.getElementById('inv-new-address') || {}).value || '').trim();
+    _jobCity = ((document.getElementById('inv-new-city') || {}).value || '').trim();
+    _jobState = ((document.getElementById('inv-new-state') || {}).value || '').trim();
+    _jobZip = ((document.getElementById('inv-new-zip') || {}).value || '').trim();
+  }
+
   const payload = {
     clientName: _primaryClient.name,
     clientEmail: _primaryClient.email,
     businessProfileId: document.getElementById('inv-business-select').value || null,
     clientPhone: normalizePhone(_primaryClient.phone),
     clientCompany: _primaryClient.company || '',
-    clientAddress: _primaryClient.address || '',
-    clientCity: _primaryClient.city || '',
-    clientState: _primaryClient.state || '',
-    clientZip: _primaryClient.zip || '',
+    clientAddress: _jobAddr,
+    clientCity: _jobCity,
+    clientState: _jobState,
+    clientZip: _jobZip,
     items,
     taxRate,
     notes: document.getElementById('notes').value.trim(),
@@ -655,6 +758,9 @@ async function submitInvoice(e) {
     const data = await res.json();
     if (!res.ok) throw new Error(`${data.error || 'Failed'}${data.detail ? ': ' + data.detail : ''}`);
 
+    if (_jobAddr && (!_addrSel || _addrSel.value === 'new')) {
+      _saveClientAddress(_primaryClient.email, _jobAddr, _jobCity, _jobState, _jobZip);
+    }
     resetInvoiceForm();
     loadInvoices();
     showTab('dashboard');
@@ -680,6 +786,7 @@ function resetInvoiceForm() {
   _primaryClient = null;
   _coClients = [];
   _addingCoClient = false;
+  _invAddrIdx = 0;
   renderInvClientSection();
   recalcTotals();
 }
@@ -1193,10 +1300,23 @@ function fillEstimateClient(id) {
   document.getElementById('est-client-email').value = c.email || '';
   document.getElementById('est-client-phone').value = c.phone || '';
   document.getElementById('est-client-company').value = c.company || '';
-  document.getElementById('est-client-address').value = c.address || '';
-  document.getElementById('est-client-city').value = c.city || '';
-  document.getElementById('est-client-state').value = c.state || '';
-  document.getElementById('est-client-zip').value = c.zip || '';
+  const allAddrs = _getClientAddresses(c);
+  const pickerWrap = document.getElementById('est-addr-picker-wrap');
+  const addrSel = document.getElementById('est-addr-select');
+  if (allAddrs.length > 0 && pickerWrap && addrSel) {
+    addrSel.innerHTML = allAddrs.map(function(a, i) {
+      const label = [a.address, a.city, a.state, a.zip].filter(Boolean).join(', ');
+      return '<option value="' + i + '">' + esc(label) + '</option>';
+    }).join('') + '<option value="new">+ Add new address</option>';
+    pickerWrap.style.display = '';
+    estOnAddressSelect('0', c);
+  } else {
+    if (pickerWrap) pickerWrap.style.display = 'none';
+    document.getElementById('est-client-address').value = c.address || '';
+    document.getElementById('est-client-city').value = c.city || '';
+    document.getElementById('est-client-state').value = c.state || '';
+    document.getElementById('est-client-zip').value = c.zip || '';
+  }
 }
 
 function showClientForm() {
@@ -2035,10 +2155,23 @@ function fillEstimateClient(id) {
   document.getElementById('est-client-email').value = c.email || '';
   document.getElementById('est-client-phone').value = c.phone || '';
   document.getElementById('est-client-company').value = c.company || '';
-  document.getElementById('est-client-address').value = c.address || '';
-  document.getElementById('est-client-city').value = c.city || '';
-  document.getElementById('est-client-state').value = c.state || '';
-  document.getElementById('est-client-zip').value = c.zip || '';
+  const allAddrs = _getClientAddresses(c);
+  const pickerWrap = document.getElementById('est-addr-picker-wrap');
+  const addrSel = document.getElementById('est-addr-select');
+  if (allAddrs.length > 0 && pickerWrap && addrSel) {
+    addrSel.innerHTML = allAddrs.map(function(a, i) {
+      const label = [a.address, a.city, a.state, a.zip].filter(Boolean).join(', ');
+      return '<option value="' + i + '">' + esc(label) + '</option>';
+    }).join('') + '<option value="new">+ Add new address</option>';
+    pickerWrap.style.display = '';
+    estOnAddressSelect('0', c);
+  } else {
+    if (pickerWrap) pickerWrap.style.display = 'none';
+    document.getElementById('est-client-address').value = c.address || '';
+    document.getElementById('est-client-city').value = c.city || '';
+    document.getElementById('est-client-state').value = c.state || '';
+    document.getElementById('est-client-zip').value = c.zip || '';
+  }
 }
 
 async function saveClientFromRow(name, email, phone, company, address, city, state, zip) {
@@ -2098,6 +2231,13 @@ async function submitEstimate(e) {
     const data = await res.json();
     if (!res.ok) throw new Error(`${data.error || 'Failed'}${data.detail ? ': ' + data.detail : ''}`);
 
+    const _estAddrSel = document.getElementById('est-addr-select');
+    const _estPickerWrap = document.getElementById('est-addr-picker-wrap');
+    if (_estPickerWrap && _estPickerWrap.style.display !== 'none' && _estAddrSel && _estAddrSel.value === 'new') {
+      const _ea = document.getElementById('est-client-address').value.trim();
+      const _em = document.getElementById('est-client-email').value.trim();
+      if (_ea && _em) _saveClientAddress(_em, _ea, document.getElementById('est-client-city').value.trim(), document.getElementById('est-client-state').value.trim(), document.getElementById('est-client-zip').value.trim());
+    }
     resetEstimateForm();
     loadEstimates();
     showTab('dashboard');
@@ -2123,6 +2263,8 @@ function resetEstimateForm() {
   ['est-client-name','est-client-email','est-client-phone','est-client-company','est-client-address','est-client-city','est-client-state','est-client-zip','est-notes'].forEach(id => {
     const el = document.getElementById(id); if (el) el.value = '';
   });
+  const _rPickerWrap = document.getElementById('est-addr-picker-wrap');
+  if (_rPickerWrap) _rPickerWrap.style.display = 'none';
   recalcEstimateTotals();
 }
 

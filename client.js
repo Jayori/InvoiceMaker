@@ -108,7 +108,7 @@ function showProfile(client, invoices, estimates, justPaid, passcode) {
 
   const invList = document.getElementById('cdash-inv-list');
   invList.innerHTML = invoices.length
-    ? invoices.map(inv => buildInvoiceRow(inv, justPaid)).join('')
+    ? buildInvoiceListByAddress(invoices, justPaid)
     : '<p class="cdash-empty">No invoices yet.</p>';
 
   const estList = document.getElementById('cdash-est-list');
@@ -142,8 +142,7 @@ function buildDashHome(invoices, estimates, justPaid) {
     html += pendingEsts.map(est => buildEstimateRow(est)).join('');
   }
   if (unpaidInvs.length) {
-    html += `<div class="cdash-section-label">Invoices Due</div>`;
-    html += unpaidInvs.map(inv => buildInvoiceRow(inv, justPaid)).join('');
+    html += buildInvoiceListByAddress(unpaidInvs, justPaid, 'Invoices Due');
   }
   container.innerHTML = html;
 }
@@ -321,6 +320,27 @@ function buildEstimateDetailHtml(est) {
     ${chatHtml}
     ${msgFormHtml}
   `;
+}
+
+function getAddressLabel(inv) {
+  return [inv.client_address, inv.client_city, inv.client_state, inv.client_zip].filter(Boolean).join(', ');
+}
+
+function buildInvoiceListByAddress(invoices, justPaid, sectionLabel) {
+  const groups = {}, order = [];
+  invoices.forEach(inv => {
+    const addr = getAddressLabel(inv) || 'Other';
+    if (!groups[addr]) { groups[addr] = []; order.push(addr); }
+    groups[addr].push(inv);
+  });
+  const multiAddr = order.length > 1;
+  let html = '';
+  if (sectionLabel) html += `<div class="cdash-section-label">${sectionLabel}</div>`;
+  order.forEach(addr => {
+    if (multiAddr) html += `<div class="cdash-address-label">${esc(addr)}</div>`;
+    html += groups[addr].map(inv => buildInvoiceRow(inv, justPaid)).join('');
+  });
+  return html;
 }
 
 function buildInvoiceRow(inv, justPaid) {

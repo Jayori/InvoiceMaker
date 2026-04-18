@@ -639,6 +639,21 @@ body.has-cdash .client-wrap { display: none !important; }
 }
 .cdash-section-label:first-child { margin-top: 0; }
 .cdash-empty { color: var(--gray-400); font-size: 14px; padding: 24px 0; }
+.cdash-address-label {
+  font-size: 12px; font-weight: 600; color: var(--gray-500);
+  margin: 16px 0 8px; padding-bottom: 6px;
+  border-bottom: 1px solid var(--gray-200);
+}
+.cdash-address-label:first-child { margin-top: 0; }
+.inv-addr-section {
+  margin-top: 14px; padding-top: 14px;
+  border-top: 1px solid var(--gray-200);
+}
+.inv-addr-label {
+  font-size: 12px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.06em; color: var(--gray-500); margin-bottom: 8px;
+}
+.inv-addr-opt { font-weight: 400; text-transform: none; letter-spacing: 0; }
 .cdash-all-clear {
   display: flex; flex-direction: column; align-items: center;
   padding: 48px 24px; text-align: center;
