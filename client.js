@@ -932,7 +932,10 @@ function buildInvPaySection(inv, isPaid) {
       <div style="display:flex;gap:8px;align-items:center;">
         <span style="font-size:15px;color:var(--gray-400);">$</span>
         <input type="number" id="partial-amount-${inv.id}" placeholder="0.00" min="0.01" max="${remaining}" step="0.01" style="flex:1;padding:10px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:15px;">
-        <button onclick="submitPartialPayment('${inv.id}','${esc(clientPasscode)}')" class="btn btn-primary" style="white-space:nowrap;">Get Link</button>
+        <button onclick="submitPartialPayment('${inv.id}','${esc(clientPasscode)}')" class="btn btn-primary" style="white-space:nowrap;">Confirm Amount</button>
+      </div>
+      <div id="partial-redirect-${inv.id}" style="display:none;margin-top:12px;padding:12px 14px;background:#eff6ff;border-radius:8px;border:1px solid #bfdbfe;text-align:center;font-size:13px;color:#1e40af;font-weight:500;">
+        <span class="spinner" style="margin-right:6px;"></span>Redirecting to Square secure payments&hellip;
       </div>
       <div id="partial-error-${inv.id}" style="color:#dc2626;font-size:13px;margin-top:8px;display:none;"></div>
     </div>`;
@@ -953,7 +956,8 @@ async function submitPartialPayment(invId, passcode) {
     return;
   }
   const btn = document.querySelector(`#partial-form-${invId} .btn-primary`);
-  if (btn) { btn.disabled = true; btn.textContent = 'Loading...'; }
+  const redirectEl = document.getElementById(`partial-redirect-${invId}`);
+  if (btn) { btn.disabled = true; btn.textContent = 'Confirming...'; }
   try {
     const res = await fetch('/api/create-partial-payment', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -962,13 +966,15 @@ async function submitPartialPayment(invId, passcode) {
     const data = await res.json();
     if (!res.ok) {
       if (errEl) { errEl.textContent = data.error || 'Failed to create payment link.'; errEl.style.display = ''; }
+      if (btn) { btn.disabled = false; btn.textContent = 'Confirm Amount'; }
       return;
     }
-    window.location.href = data.paymentLink;
+    if (btn) btn.style.display = 'none';
+    if (redirectEl) redirectEl.style.display = '';
+    setTimeout(() => { window.location.href = data.paymentLink; }, 1200);
   } catch {
     if (errEl) { errEl.textContent = 'Something went wrong. Please try again.'; errEl.style.display = ''; }
-  } finally {
-    if (btn) { btn.disabled = false; btn.textContent = 'Get Link'; }
+    if (btn) { btn.disabled = false; btn.textContent = 'Confirm Amount'; }
   }
 }
 
