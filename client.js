@@ -924,7 +924,7 @@ function buildInvPaySection(inv, isPaid) {
     ${progressHtml}
     <div style="margin-top:${isPartial ? '12px' : '20px'};text-align:center;">
       ${primaryBtn}
-      <button type="button" onclick="openPartialPayForm('${inv.id}')" class="btn btn-secondary" style="display:block;width:100%;margin-top:10px;">Pay a Different Amount</button>
+      <button type="button" onclick="openPartialPayForm('${inv.id}')" class="btn btn-primary btn-block btn-pay" style="margin-top:10px;">Pay Partial</button>
       <p style="margin:10px 0 0;font-size:12px;color:var(--gray-400);">Secure payment powered by Square</p>
     </div>
     <div id="partial-form-${inv.id}" style="display:none;margin-top:16px;padding:16px;background:#f9fafb;border-radius:10px;border:1px solid #e5e7eb;">
