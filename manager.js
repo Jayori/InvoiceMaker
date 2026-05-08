@@ -87,10 +87,11 @@ function handleSchedulerPrefill() {
         addItem(scDesc, 'service', 1, scAmount);
       }
     } else if (tab === 'new-estimate') {
-      const setField = (id, val) => { const el = document.getElementById(id); if (el && val) el.value = val; };
-      setField('est-client-name', clientName);
-      setField('est-client-email', clientEmail);
-      setField('est-client-phone', clientPhone);
+      if (clientName && clientEmail) {
+        _primaryEstClient = { name: clientName, email: clientEmail.toLowerCase(), phone: clientPhone || '', company: '', address: '', city: '', state: '', zip: '', addresses: [] };
+        _estAddrIdx = -1;
+        renderEstClientSection();
+      }
       if (scAmount) {
         const itemsWrap = document.getElementById('est-items');
         if (itemsWrap) {
@@ -126,6 +127,7 @@ function showTab(name, link) {
   if (name === 'dashboard') { loadInvoices(); loadEstimates(); }
   if (name === 'clients') loadClients();
   if (name === 'new-invoice') renderInvClientSection();
+  if (name === 'new-estimate') renderEstClientSection();
   if (name === 'schedule') loadSchedule();
   if (name === 'settings') { loadBusinessProfiles(); loadGcalStatus(); handleGcalRedirect(); }
   if (name === 'analytics') buildAnalytics();
@@ -418,10 +420,18 @@ let _coClients = [];        // [{ name, email, phone }]
 let _addingCoClient = false;
 let _invAddrIdx = 0;        // index of selected saved address in picker; -1 = new/custom
 
+function _ccOpts() {
+  return '<option value="+1">+1 US</option><option value="+1-CA">+1 CA</option><option value="+44">+44 UK</option><option value="+52">+52 MX</option><option value="+61">+61 AU</option><option value="+91">+91 IN</option><option value="+49">+49 DE</option><option value="+33">+33 FR</option><option value="+55">+55 BR</option><option value="+34">+34 ES</option><option value="+39">+39 IT</option><option value="+81">+81 JP</option><option value="+86">+86 CN</option>';
+}
+
 function renderInvClientSection() {
   const sec = document.getElementById('inv-client-section');
   if (!sec) return;
   sec.innerHTML = _primaryClient ? _buildInvClientCards() : _buildInvClientSelector();
+  setTimeout(function() {
+    initAddressAutocomplete('inv-new-address', 'inv-new-city', 'inv-new-state', 'inv-new-zip');
+    initAddressAutocomplete('inv-nc-address', 'inv-nc-city', 'inv-nc-state', 'inv-nc-zip');
+  }, 0);
 }
 
 function _buildInvClientSelector() {
@@ -440,7 +450,10 @@ function _buildInvClientSelector() {
       '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">' +
         '<input type="text" id="inv-nc-name" placeholder="Name *" style="font-size:14px;">' +
         '<input type="email" id="inv-nc-email" placeholder="Email *" style="font-size:14px;">' +
-        '<input type="text" id="inv-nc-phone" placeholder="Phone" style="font-size:14px;">' +
+        '<div style="display:flex;gap:6px;">' +
+          '<select id="inv-nc-phone-cc" style="font-size:13px;width:80px;flex-shrink:0;">' + _ccOpts() + '</select>' +
+          '<input type="text" id="inv-nc-phone" placeholder="(XXX) XXX-XXXX" style="font-size:14px;flex:1;">' +
+        '</div>' +
         '<input type="text" id="inv-nc-company" placeholder="Company" style="font-size:14px;">' +
       '</div>' +
       '<div id="inv-nc-addr-wrap" style="display:none;margin-bottom:8px;">' +
@@ -472,6 +485,7 @@ function invOnAddressSelect(val) {
   if (val === 'new') {
     _invAddrIdx = -1;
     if (fields) fields.style.display = '';
+    setTimeout(function() { initAddressAutocomplete('inv-new-address', 'inv-new-city', 'inv-new-state', 'inv-new-zip'); }, 0);
   } else {
     _invAddrIdx = parseInt(val) || 0;
     if (fields) fields.style.display = 'none';
@@ -625,7 +639,7 @@ function invConfirmNewClient() {
   _primaryClient = {
     name: name.trim(),
     email: email.trim().toLowerCase(),
-    phone: ((document.getElementById('inv-nc-phone') || {}).value || '').trim(),
+    phone: buildPhone('inv-nc-phone-cc', 'inv-nc-phone'),
     company: ((document.getElementById('inv-nc-company') || {}).value || '').trim(),
     address: ((document.getElementById('inv-nc-address') || {}).value || '').trim(),
     city: ((document.getElementById('inv-nc-city') || {}).value || '').trim(),
@@ -645,6 +659,7 @@ function invToggleAddr() {
   const shown = wrap.style.display !== 'none';
   wrap.style.display = shown ? 'none' : '';
   if (btn) btn.textContent = shown ? '+ Address' : '\u2212 Address';
+  if (!shown) setTimeout(function() { initAddressAutocomplete('inv-nc-address', 'inv-nc-city', 'inv-nc-state', 'inv-nc-zip'); }, 0);
 }
 
 function invRemovePrimaryClient() {
@@ -1013,7 +1028,7 @@ function cmEstimate() {
   const c = activeClientId ? clientsCache.find(x => x.id === activeClientId) : null;
   closeClientModal();
   showTab('new-estimate');
-  if (c) setTimeout(() => fillEstimateClient(c.id), 50);
+  if (c) setTimeout(function() { estPickSavedClient(c.email); }, 50);
 }
 
 function cmInvoice() {
@@ -1291,6 +1306,219 @@ function fillClient(id) {
   _primaryClient = { name: c.name || '', email: c.email || '', phone: c.phone || '', company: c.company || '', address: c.address || '', city: c.city || '', state: c.state || '', zip: c.zip || '' };
   _addingCoClient = false;
   renderInvClientSection();
+}
+
+// ─── Estimate client card UI ────────────────────────────────────────────────────
+
+let _primaryEstClient = null;
+let _estAddingCoClient = false;
+let _estAddrIdx = 0;
+
+function renderEstClientSection() {
+  const sec = document.getElementById('est-client-section');
+  if (!sec) return;
+  sec.innerHTML = _primaryEstClient ? _buildEstClientCards() : _buildEstClientSelector();
+  setTimeout(function() {
+    initAddressAutocomplete('est-new-address', 'est-new-city', 'est-new-state', 'est-new-zip');
+    initAddressAutocomplete('est-nc-address', 'est-nc-city', 'est-nc-state', 'est-nc-zip');
+  }, 0);
+}
+
+function _buildEstClientSelector() {
+  const options = clientsCache.map(function(c) {
+    return '<option value="' + escAttr(c.email) + '">' + esc(c.name) + (c.company ? ' (' + esc(c.company) + ')' : '') + (c.email ? ' \u2014 ' + esc(c.email) : '') + '</option>';
+  }).join('');
+  return (
+    (options
+      ? '<div style="margin-bottom:12px;"><label style="font-size:13px;font-weight:500;color:var(--gray-700);display:block;margin-bottom:6px;">Saved Client</label>' +
+          '<select onchange="estPickSavedClient(this.value)" style="width:100%;">' +
+            '<option value="">— Select a saved client —</option>' + options +
+          '</select></div>'
+      : '') +
+    '<div class="inv-selector-or">or enter new client</div>' +
+    '<div class="inv-client-input-form">' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">' +
+        '<input type="text" id="est-nc-name" placeholder="Name *" style="font-size:14px;">' +
+        '<input type="email" id="est-nc-email" placeholder="Email *" style="font-size:14px;">' +
+        '<div style="display:flex;gap:6px;">' +
+          '<select id="est-nc-phone-cc" style="font-size:13px;width:80px;flex-shrink:0;">' + _ccOpts() + '</select>' +
+          '<input type="text" id="est-nc-phone" placeholder="(XXX) XXX-XXXX" style="font-size:14px;flex:1;">' +
+        '</div>' +
+        '<input type="text" id="est-nc-company" placeholder="Company" style="font-size:14px;">' +
+      '</div>' +
+      '<div id="est-nc-addr-wrap" style="display:none;margin-bottom:8px;">' +
+        '<input type="text" id="est-nc-address" placeholder="Street Address" style="font-size:14px;width:100%;margin-bottom:6px;">' +
+        '<div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:8px;">' +
+          '<input type="text" id="est-nc-city" placeholder="City" style="font-size:14px;">' +
+          '<input type="text" id="est-nc-state" placeholder="ST" style="font-size:14px;">' +
+          '<input type="text" id="est-nc-zip" placeholder="ZIP" style="font-size:14px;">' +
+        '</div>' +
+      '</div>' +
+      '<div style="display:flex;gap:8px;align-items:center;">' +
+        '<button type="button" onclick="estConfirmNewClient()" class="btn btn-primary" style="flex:1;justify-content:center;">Confirm Client</button>' +
+        '<button type="button" onclick="estToggleAddr()" id="est-addr-toggle" style="background:none;border:none;color:var(--gray-400);cursor:pointer;font-size:13px;white-space:nowrap;">+ Address</button>' +
+      '</div>' +
+    '</div>'
+  );
+}
+
+function _buildEstClientCards() {
+  const c = _primaryEstClient;
+  const initials = (c.name || '?').split(' ').map(function(w){return w[0]||'';}).join('').toUpperCase().slice(0,2) || '?';
+  const subLine = [c.email, c.phone, c.company].filter(Boolean).join(' \u00b7 ');
+
+  const allAddrs = _getClientAddresses(c);
+  let addrPickerHtml;
+  if (allAddrs.length > 0) {
+    const opts = allAddrs.map(function(a, i) {
+      const label = [a.address, a.city, a.state, a.zip].filter(Boolean).join(', ');
+      return '<option value="' + i + '"' + (_estAddrIdx === i ? ' selected' : '') + '>' + escAttr(label) + '</option>';
+    }).join('');
+    addrPickerHtml = (
+      '<div class="inv-addr-section">' +
+        '<div class="inv-addr-label">Job Address</div>' +
+        '<select id="est-addr-select" onchange="estOnAddressSelectCard(this.value)" style="width:100%;margin-bottom:6px;">' +
+          opts +
+          '<option value="new"' + (_estAddrIdx === -1 ? ' selected' : '') + '>+ Add new address</option>' +
+        '</select>' +
+        '<div id="est-addr-fields" style="display:' + (_estAddrIdx === -1 ? '' : 'none') + ';margin-top:4px;">' +
+          '<input type="text" id="est-new-address" placeholder="Street Address" style="width:100%;margin-bottom:6px;font-size:14px;">' +
+          '<div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:6px;">' +
+            '<input type="text" id="est-new-city" placeholder="City" style="font-size:14px;">' +
+            '<input type="text" id="est-new-state" placeholder="ST" style="font-size:14px;">' +
+            '<input type="text" id="est-new-zip" placeholder="ZIP" style="font-size:14px;">' +
+          '</div>' +
+        '</div>' +
+      '</div>'
+    );
+  } else {
+    addrPickerHtml = (
+      '<div class="inv-addr-section">' +
+        '<div class="inv-addr-label">Job Address <span class="inv-addr-opt">(optional)</span></div>' +
+        '<input type="text" id="est-new-address" value="' + escAttr(c.address || '') + '" placeholder="Street Address" style="width:100%;margin-bottom:6px;font-size:14px;">' +
+        '<div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:6px;">' +
+          '<input type="text" id="est-new-city" value="' + escAttr(c.city || '') + '" placeholder="City" style="font-size:14px;">' +
+          '<input type="text" id="est-new-state" value="' + escAttr(c.state || '') + '" placeholder="ST" style="font-size:14px;">' +
+          '<input type="text" id="est-new-zip" value="' + escAttr(c.zip || '') + '" placeholder="ZIP" style="font-size:14px;">' +
+        '</div>' +
+      '</div>'
+    );
+  }
+
+  return (
+    '<div class="inv-client-card primary-card">' +
+      '<div class="cc-avatar">' + initials + '</div>' +
+      '<div class="cc-info">' +
+        '<div class="cc-name">' + esc(c.name) + '</div>' +
+        '<div class="cc-sub">' + esc(subLine) + '</div>' +
+      '</div>' +
+      '<button type="button" class="cc-remove" onclick="estRemovePrimaryClient()" title="Change client">&#x2715;</button>' +
+    '</div>' +
+    addrPickerHtml
+  );
+}
+
+function estPickSavedClient(email) {
+  if (!email) return;
+  const c = clientsCache.find(function(cl){ return cl.email === email; });
+  if (!c) return;
+  _primaryEstClient = { name: c.name || '', email: c.email || '', phone: c.phone || '', company: c.company || '', address: c.address || '', city: c.city || '', state: c.state || '', zip: c.zip || '', addresses: c.addresses || [] };
+  _estAddrIdx = _getClientAddresses(_primaryEstClient).length > 0 ? 0 : -1;
+  renderEstClientSection();
+}
+
+function estConfirmNewClient() {
+  const name = ((document.getElementById('est-nc-name') || {}).value || '').trim();
+  const email = ((document.getElementById('est-nc-email') || {}).value || '').trim();
+  if (!name || !email) { showToast('Name and email are required.', 'error'); return; }
+  _primaryEstClient = {
+    name: name,
+    email: email.toLowerCase(),
+    phone: buildPhone('est-nc-phone-cc', 'est-nc-phone'),
+    company: ((document.getElementById('est-nc-company') || {}).value || '').trim(),
+    address: ((document.getElementById('est-nc-address') || {}).value || '').trim(),
+    city: ((document.getElementById('est-nc-city') || {}).value || '').trim(),
+    state: ((document.getElementById('est-nc-state') || {}).value || '').trim(),
+    zip: ((document.getElementById('est-nc-zip') || {}).value || '').trim(),
+    addresses: [],
+  };
+  _estAddrIdx = -1;
+  renderEstClientSection();
+}
+
+function estToggleAddr() {
+  const wrap = document.getElementById('est-nc-addr-wrap');
+  const btn = document.getElementById('est-addr-toggle');
+  if (!wrap) return;
+  const shown = wrap.style.display !== 'none';
+  wrap.style.display = shown ? 'none' : '';
+  if (btn) btn.textContent = shown ? '+ Address' : '\u2212 Address';
+  if (!shown) setTimeout(function() { initAddressAutocomplete('est-nc-address', 'est-nc-city', 'est-nc-state', 'est-nc-zip'); }, 0);
+}
+
+function estRemovePrimaryClient() {
+  _primaryEstClient = null;
+  _estAddrIdx = 0;
+  renderEstClientSection();
+}
+
+function estOnAddressSelectCard(val) {
+  const fields = document.getElementById('est-addr-fields');
+  if (val === 'new') {
+    _estAddrIdx = -1;
+    if (fields) fields.style.display = '';
+    setTimeout(function() { initAddressAutocomplete('est-new-address', 'est-new-city', 'est-new-state', 'est-new-zip'); }, 0);
+  } else {
+    _estAddrIdx = parseInt(val) || 0;
+    if (fields) fields.style.display = 'none';
+  }
+}
+
+// ─── Google Places Autocomplete ──────────────────────────────────────────────
+
+let _mapsReady = false;
+let _acPending = [];
+
+window._onMapsLoaded = function() {
+  _mapsReady = true;
+  _acPending.forEach(function(fn) { fn(); });
+  _acPending = [];
+};
+
+(async function loadMapsScript() {
+  try {
+    const res = await fetch('/api/get-maps-config');
+    if (!res.ok) return;
+    const cfg = await res.json();
+    if (!cfg.googleMapsApiKey) return;
+    const s = document.createElement('script');
+    s.src = 'https://maps.googleapis.com/maps/api/js?key=' + encodeURIComponent(cfg.googleMapsApiKey) + '&libraries=places&callback=_onMapsLoaded';
+    s.async = true; s.defer = true;
+    document.head.appendChild(s);
+  } catch(e) {}
+})();
+
+function initAddressAutocomplete(streetId, cityId, stateId, zipId) {
+  function doInit() {
+    const input = document.getElementById(streetId);
+    if (!input || input._acInit) return;
+    input._acInit = true;
+    try {
+      const ac = new google.maps.places.Autocomplete(input, { types: ['address'] });
+      ac.addListener('place_changed', function() {
+        const place = ac.getPlace();
+        const comps = place.address_components || [];
+        const get = function(type) { return (comps.find(function(c) { return c.types.includes(type); }) || {}).short_name || ''; };
+        const getLong = function(type) { return (comps.find(function(c) { return c.types.includes(type); }) || {}).long_name || ''; };
+        const street = [get('street_number'), getLong('route')].filter(Boolean).join(' ');
+        if (street) input.value = street;
+        if (cityId) { const el = document.getElementById(cityId); if (el) el.value = getLong('locality') || getLong('sublocality_level_1') || ''; }
+        if (stateId) { const el = document.getElementById(stateId); if (el) el.value = get('administrative_area_level_1') || ''; }
+        if (zipId) { const el = document.getElementById(zipId); if (el) el.value = get('postal_code') || ''; }
+      });
+    } catch(e) {}
+  }
+  if (_mapsReady && typeof google !== 'undefined') { doInit(); } else { _acPending.push(doInit); }
 }
 
 function fillEstimateClient(id) {
@@ -2194,22 +2422,35 @@ async function submitEstimate(e) {
   if (!items.length || items.some(i => !i.description || i.cost < 0)) {
     showToast('Please complete all estimate items.', 'error'); return;
   }
+  if (!_primaryEstClient) { showToast('Please select or confirm a client first.', 'error'); return; }
 
   const useTax = document.getElementById('est-tax-toggle').checked;
   const taxRate = useTax ? (parseFloat(document.getElementById('est-tax-rate').value) || 0) : 0;
 
   const receiptPhotos = await collectPhotos('est-photos');
 
+  const _estAddrSel = document.getElementById('est-addr-select');
+  let _estJobAddr = '', _estJobCity = '', _estJobState = '', _estJobZip = '';
+  if (_estAddrSel && _estAddrSel.value !== 'new') {
+    const _ea = _getClientAddresses(_primaryEstClient)[parseInt(_estAddrSel.value)] || {};
+    _estJobAddr = _ea.address || ''; _estJobCity = _ea.city || ''; _estJobState = _ea.state || ''; _estJobZip = _ea.zip || '';
+  } else {
+    _estJobAddr = ((document.getElementById('est-new-address') || {}).value || '').trim();
+    _estJobCity = ((document.getElementById('est-new-city') || {}).value || '').trim();
+    _estJobState = ((document.getElementById('est-new-state') || {}).value || '').trim();
+    _estJobZip = ((document.getElementById('est-new-zip') || {}).value || '').trim();
+  }
+
   const payload = {
-    clientName: document.getElementById('est-client-name').value.trim(),
-    clientEmail: document.getElementById('est-client-email').value.trim(),
+    clientName: _primaryEstClient.name,
+    clientEmail: _primaryEstClient.email,
     businessProfileId: document.getElementById('est-business-select').value || null,
-    clientPhone: buildPhone('est-client-phone-cc', 'est-client-phone'),
-    clientCompany: document.getElementById('est-client-company').value.trim(),
-    clientAddress: document.getElementById('est-client-address').value.trim(),
-    clientCity: document.getElementById('est-client-city').value.trim(),
-    clientState: document.getElementById('est-client-state').value.trim(),
-    clientZip: document.getElementById('est-client-zip').value.trim(),
+    clientPhone: _primaryEstClient.phone || '',
+    clientCompany: _primaryEstClient.company || '',
+    clientAddress: _estJobAddr,
+    clientCity: _estJobCity,
+    clientState: _estJobState,
+    clientZip: _estJobZip,
     items,
     taxRate,
     notes: document.getElementById('est-notes').value.trim(),
@@ -2231,12 +2472,8 @@ async function submitEstimate(e) {
     const data = await res.json();
     if (!res.ok) throw new Error(`${data.error || 'Failed'}${data.detail ? ': ' + data.detail : ''}`);
 
-    const _estAddrSel = document.getElementById('est-addr-select');
-    const _estPickerWrap = document.getElementById('est-addr-picker-wrap');
-    if (_estPickerWrap && _estPickerWrap.style.display !== 'none' && _estAddrSel && _estAddrSel.value === 'new') {
-      const _ea = document.getElementById('est-client-address').value.trim();
-      const _em = document.getElementById('est-client-email').value.trim();
-      if (_ea && _em) _saveClientAddress(_em, _ea, document.getElementById('est-client-city').value.trim(), document.getElementById('est-client-state').value.trim(), document.getElementById('est-client-zip').value.trim());
+    if (_estJobAddr && (!_estAddrSel || _estAddrSel.value === 'new')) {
+      _saveClientAddress(_primaryEstClient.email, _estJobAddr, _estJobCity, _estJobState, _estJobZip);
     }
     resetEstimateForm();
     loadEstimates();
@@ -2260,11 +2497,11 @@ function resetEstimateForm() {
   document.getElementById('est-completion-display').style.display = 'none';
   const photoPreview = document.getElementById('est-photo-preview');
   if (photoPreview) photoPreview.innerHTML = '';
-  ['est-client-name','est-client-email','est-client-phone','est-client-company','est-client-address','est-client-city','est-client-state','est-client-zip','est-notes'].forEach(id => {
-    const el = document.getElementById(id); if (el) el.value = '';
-  });
-  const _rPickerWrap = document.getElementById('est-addr-picker-wrap');
-  if (_rPickerWrap) _rPickerWrap.style.display = 'none';
+  const _estNotesEl = document.getElementById('est-notes');
+  if (_estNotesEl) _estNotesEl.value = '';
+  _primaryEstClient = null;
+  _estAddrIdx = 0;
+  renderEstClientSection();
   recalcEstimateTotals();
 }
 
