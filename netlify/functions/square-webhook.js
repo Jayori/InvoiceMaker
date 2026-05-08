@@ -69,17 +69,48 @@ exports.handler = async (event) => {
   if (isCompleted) {
     const orderId = payment.order_id;
     const paymentId = payment.id;
+    const paidCents = payment.amount_money?.amount;
+    const paidAmount = paidCents != null ? paidCents / 100 : null;
 
     if (orderId) {
-      const { data: matched, error } = await supabase
+      // Try matching on original square_order_id first
+      let invoice = null;
+      const { data: byOriginal } = await supabase
         .from('invoices')
-        .update({ status: 'paid', square_payment_id: paymentId, paid_at: new Date().toISOString() })
+        .select('id, invoice_number, total, amount_paid, status')
         .eq('square_order_id', orderId)
-        .eq('status', 'pending')
-        .select('id, invoice_number');
+        .in('status', ['pending', 'partial'])
+        .maybeSingle();
 
-      console.log('Invoice update matched:', matched?.length ?? 0, 'rows');
-      if (error) console.error('Supabase invoice update error:', error);
+      if (byOriginal) {
+        invoice = byOriginal;
+      } else {
+        // Try matching on partial payment order IDs
+        const { data: byPartial } = await supabase
+          .from('invoices')
+          .select('id, invoice_number, total, amount_paid, status')
+          .contains('partial_order_ids', [orderId])
+          .in('status', ['pending', 'partial'])
+          .maybeSingle();
+        if (byPartial) invoice = byPartial;
+      }
+
+      if (invoice) {
+        const currentPaid = parseFloat(invoice.amount_paid) || 0;
+        const total = parseFloat(invoice.total);
+        const newPaid = paidAmount !== null
+          ? Math.min(+(currentPaid + paidAmount).toFixed(2), total)
+          : total;
+        const newStatus = newPaid >= total - 0.01 ? 'paid' : 'partial';
+        const update = { amount_paid: newPaid, status: newStatus, square_payment_id: paymentId };
+        if (newStatus === 'paid') update.paid_at = new Date().toISOString();
+
+        const { error } = await supabase.from('invoices').update(update).eq('id', invoice.id);
+        console.log('Invoice updated:', invoice.invoice_number, '| status:', newStatus, '| amount_paid:', newPaid);
+        if (error) console.error('Supabase invoice update error:', error);
+      } else {
+        console.log('No matching invoice for order_id:', orderId);
+      }
 
       const { data: depMatched } = await supabase
         .from('estimates')

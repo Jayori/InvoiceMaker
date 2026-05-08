@@ -79,6 +79,7 @@ textarea { resize: vertical; min-height: 80px; }
 .badge { display: inline-flex; align-items: center; padding: 3px 10px; border-radius: 999px; font-size: 12px; font-weight: 500; }
 .badge-pending { background: #fef3c7; color: #92400e; }
 .badge-paid { background: var(--green-light); color: var(--green); }
+.badge-partial { background: #fefce8; color: #a16207; }
 .badge-cancelled { background: var(--gray-100); color: var(--gray-500); }
 
 /* ─── Line items ──────────────────────────────────── */
@@ -171,6 +172,12 @@ textarea { resize: vertical; min-height: 80px; }
 .inv-status-badge { display: inline-block; padding: 4px 12px; border-radius: 999px; font-size: 12px; font-weight: 600; margin-top: 4px; }
 .inv-status-paid { background: var(--green-light); color: var(--green); }
 .inv-status-pending { background: #fef3c7; color: #92400e; }
+.inv-status-partial { background: #fefce8; color: #a16207; }
+.partial-summary { margin: 16px 0; padding: 14px 16px; background: #fff7ed; border-radius: 10px; border: 1px solid #fdba74; }
+.partial-summary-label { font-size: 11px; font-weight: 700; color: #c2410c; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px; }
+.partial-summary-row { display: flex; justify-content: space-between; font-size: 14px; padding: 2px 0; color: var(--gray-600); }
+.partial-summary-paid { font-weight: 600; color: #059669; }
+.partial-summary-balance { font-size: 15px; font-weight: 700; color: var(--blue); padding-top: 6px; margin-top: 4px; border-top: 1px solid #fdba74; }
 .inv-meta { display: flex; gap: 32px; margin-bottom: 24px; }
 .inv-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--gray-400); display: block; margin-bottom: 4px; }
 .inv-val { font-size: 14px; font-weight: 600; color: var(--gray-900); display: block; }

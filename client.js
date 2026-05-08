@@ -345,12 +345,15 @@ function buildInvoiceListByAddress(invoices, justPaid, sectionLabel) {
 
 function buildInvoiceRow(inv, justPaid) {
   const isPaid = inv.status === 'paid' || justPaid;
-  const statusClass = isPaid ? 'inv-status-paid' : 'inv-status-pending';
-  const statusLabel = isPaid ? 'Paid' : 'Unpaid';
+  const isPartial = !isPaid && inv.status === 'partial';
+  const statusClass = isPaid ? 'inv-status-paid' : isPartial ? 'inv-status-partial' : 'inv-status-pending';
+  const statusLabel = isPaid ? 'Paid' : isPartial ? 'Partial' : 'Unpaid';
   const dateStr = inv.created_at ? new Date(inv.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '';
-  const payBtnHtml = !isPaid && inv.square_payment_link
-    ? `<a href="${esc(inv.square_payment_link)}" class="profile-pay-btn" onclick="event.stopPropagation()" target="_blank">Pay Now</a>`
-    : '';
+  const amtPaid = Number(inv.amount_paid || 0);
+  const remaining = (Number(inv.total) - amtPaid).toFixed(2);
+  const payBtnHtml = isPaid ? '' : isPartial
+    ? `<span style="font-size:11px;font-weight:600;color:#c2410c;">$${remaining} left</span>`
+    : (inv.square_payment_link ? `<a href="${esc(inv.square_payment_link)}" class="profile-pay-btn" onclick="event.stopPropagation()" target="_blank">Pay Now</a>` : '');
 
   return `
     <div class="profile-row" id="profile-inv-row-${inv.id}">
@@ -430,12 +433,7 @@ function buildInvoiceDetailHtml(inv, isPaid) {
       </div>
       ${inv.notes ? `<div class="est-notes" style="margin-top:12px;">${esc(inv.notes)}</div>` : ''}
       ${photosHtml}
-      ${!isPaid && inv.square_payment_link ? `
-        <div style="margin-top:20px;text-align:center;">
-          <a href="${esc(inv.square_payment_link)}" class="btn btn-primary btn-block btn-pay" target="_blank">Pay Now &rarr;</a>
-          <p style="margin:10px 0 0;font-size:12px;color:var(--gray-400);">Secure payment powered by Square</p>
-        </div>` : ''}
-      ${isPaid ? `<div class="paid-notice" style="margin-top:16px;">Payment received &mdash; thank you!</div>` : ''}
+      ${buildInvPaySection(inv, isPaid)}
     </div>`;
 }
 
@@ -898,6 +896,97 @@ async function sendEstimateQuestion(estimateId) {
     document.getElementById(`msg-form-${estimateId}`).style.display = 'none';
   } catch { alert('Something went wrong.'); }
   finally { if (btn) { btn.disabled = false; btn.textContent = 'Send Question'; } }
+}
+
+// ── Partial payment helpers ───────────────────────────────────────────────────
+
+function buildInvPaySection(inv, isPaid) {
+  if (isPaid) return `<div class="paid-notice" style="margin-top:16px;">Payment received &mdash; thank you!</div>`;
+
+  const amtPaid = Number(inv.amount_paid || 0);
+  const isPartial = inv.status === 'partial';
+  const remaining = (Number(inv.total) - amtPaid).toFixed(2);
+  const canPay = inv.square_payment_link || isPartial;
+  if (!canPay) return '';
+
+  const progressHtml = isPartial ? `
+    <div class="partial-summary">
+      <div class="partial-summary-label">Partial Payment Received</div>
+      <div class="partial-summary-row"><span>Amount paid</span><span class="partial-summary-paid">$${amtPaid.toFixed(2)}</span></div>
+      <div class="partial-summary-row partial-summary-balance"><span>Remaining balance</span><span>$${remaining}</span></div>
+    </div>` : '';
+
+  const primaryBtn = isPartial
+    ? `<button id="pay-remaining-${inv.id}" onclick="payRemaining('${inv.id}','${esc(clientPasscode)}',${remaining})" class="btn btn-primary btn-block btn-pay">Pay Remaining $${remaining} &rarr;</button>`
+    : `<a href="${esc(inv.square_payment_link)}" class="btn btn-primary btn-block btn-pay" target="_blank">Pay Now &rarr;</a>`;
+
+  return `
+    ${progressHtml}
+    <div style="margin-top:${isPartial ? '12px' : '20px'};text-align:center;">
+      ${primaryBtn}
+      <button type="button" onclick="openPartialPayForm('${inv.id}')" class="btn btn-secondary" style="display:block;width:100%;margin-top:10px;">Pay a Different Amount</button>
+      <p style="margin:10px 0 0;font-size:12px;color:var(--gray-400);">Secure payment powered by Square</p>
+    </div>
+    <div id="partial-form-${inv.id}" style="display:none;margin-top:16px;padding:16px;background:#f9fafb;border-radius:10px;border:1px solid #e5e7eb;">
+      <div style="font-size:13px;font-weight:600;margin-bottom:10px;">How much would you like to pay now?</div>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <span style="font-size:15px;color:var(--gray-400);">$</span>
+        <input type="number" id="partial-amount-${inv.id}" placeholder="0.00" min="0.01" max="${remaining}" step="0.01" style="flex:1;padding:10px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:15px;">
+        <button onclick="submitPartialPayment('${inv.id}','${esc(clientPasscode)}')" class="btn btn-primary" style="white-space:nowrap;">Get Link</button>
+      </div>
+      <div id="partial-error-${inv.id}" style="color:#dc2626;font-size:13px;margin-top:8px;display:none;"></div>
+    </div>`;
+}
+
+function openPartialPayForm(invId) {
+  const form = document.getElementById(`partial-form-${invId}`);
+  if (form) form.style.display = form.style.display === 'none' ? '' : 'none';
+}
+
+async function submitPartialPayment(invId, passcode) {
+  const input = document.getElementById(`partial-amount-${invId}`);
+  const errEl = document.getElementById(`partial-error-${invId}`);
+  const amount = parseFloat(input?.value);
+  if (errEl) errEl.style.display = 'none';
+  if (!amount || amount <= 0) {
+    if (errEl) { errEl.textContent = 'Please enter a valid amount.'; errEl.style.display = ''; }
+    return;
+  }
+  const btn = document.querySelector(`#partial-form-${invId} .btn-primary`);
+  if (btn) { btn.disabled = true; btn.textContent = 'Loading...'; }
+  try {
+    const res = await fetch('/api/create-partial-payment', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ invoiceId: invId, amount, passcode }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      if (errEl) { errEl.textContent = data.error || 'Failed to create payment link.'; errEl.style.display = ''; }
+      return;
+    }
+    window.location.href = data.paymentLink;
+  } catch {
+    if (errEl) { errEl.textContent = 'Something went wrong. Please try again.'; errEl.style.display = ''; }
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Get Link'; }
+  }
+}
+
+async function payRemaining(invId, passcode, amount) {
+  const btn = document.getElementById(`pay-remaining-${invId}`);
+  if (btn) { btn.disabled = true; btn.textContent = 'Loading...'; }
+  try {
+    const res = await fetch('/api/create-partial-payment', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ invoiceId: invId, amount, passcode }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed');
+    window.location.href = data.paymentLink;
+  } catch (err) {
+    alert(err.message || 'Failed to create payment link.');
+    if (btn) { btn.disabled = false; btn.textContent = `Pay Remaining $${amount} →`; }
+  }
 }
 
 function esc(str) {

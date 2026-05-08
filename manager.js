@@ -1692,9 +1692,14 @@ function previewInvoice(id) {
 
   // Status badge
   const isPaid = inv.status === 'paid';
+  const isPartial = inv.status === 'partial';
+  const amtPaidPreview = Number(inv.amount_paid || 0);
+  const remainingPreview = (Number(inv.total) - amtPaidPreview).toFixed(2);
   const statusHtml = isPaid
     ? `<span class="inv-status-badge inv-status-paid">Paid</span>`
-    : `<span class="inv-status-badge inv-status-pending">Payment Due</span>`;
+    : isPartial
+      ? `<span class="inv-status-badge inv-status-partial">Partial &mdash; $${remainingPreview} remaining</span>`
+      : `<span class="inv-status-badge inv-status-pending">Payment Due</span>`;
 
   // Due date
   const dueStr = inv.due_date
@@ -3221,6 +3226,7 @@ function printReceipt() {
     .inv-status-badge { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 12px; font-weight: 600; }
     .inv-status-paid { background: #ecfdf5; color: #059669; }
     .inv-status-pending { background: #fff7ed; color: #c2410c; }
+    .inv-status-partial { background: #fefce8; color: #a16207; }
     .work-date-header { font-size: 11px; font-weight: 700; text-transform: uppercase; color: #6b7280; background: #f9fafb; padding: 6px 10px; }
     .item-type-tag { font-size: 10px; color: #9ca3af; }
     .unpaid-stamp { text-align: center; margin: 20px 0; padding: 12px; border: 3px solid #dc2626; border-radius: 8px; color: #dc2626; font-size: 20px; font-weight: 900; letter-spacing: 0.15em; }

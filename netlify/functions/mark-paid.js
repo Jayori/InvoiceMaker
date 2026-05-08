@@ -14,9 +14,10 @@ exports.handler = async (event) => {
   if (!id) return { statusCode: 400, body: JSON.stringify({ error: 'id required' }) };
 
   if (type === 'invoice') {
+    const { data: inv } = await supabase.from('invoices').select('total').eq('id', id).maybeSingle();
     const { error } = await supabase
       .from('invoices')
-      .update({ status: 'paid', paid_at: new Date().toISOString() })
+      .update({ status: 'paid', paid_at: new Date().toISOString(), amount_paid: inv?.total || 0 })
       .eq('id', id);
     if (error) return { statusCode: 502, body: JSON.stringify({ error: error.message }) };
   } else if (type === 'estimate') {

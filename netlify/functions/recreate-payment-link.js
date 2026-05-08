@@ -63,7 +63,7 @@ exports.handler = async (event) => {
 
     const { error: updateErr } = await supabase
       .from('invoices')
-      .update({ status: 'pending', square_payment_link: newLink, square_order_id: newOrderId, paid_at: null, square_payment_id: null })
+      .update({ status: 'pending', square_payment_link: newLink, square_order_id: newOrderId, paid_at: null, square_payment_id: null, amount_paid: 0, partial_order_ids: [] })
       .eq('id', invoiceId);
 
     if (updateErr) return { statusCode: 502, body: JSON.stringify({ error: updateErr.message }) };
