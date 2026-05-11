@@ -3226,7 +3226,8 @@ async function submitMarkPaid(type) {
     const body = { id, type: 'invoice' };
     if (amount !== undefined) body.amount = amount;
     const res = await fetch('/api/mark-paid', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-    if (!res.ok) throw new Error('Failed');
+    const resData = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(resData.error || 'Failed');
     closeMarkPaidModal();
     if (window._mpaidFromPreview) closePreviewModal();
     showToast(type === 'partial' ? 'Partial payment recorded!' : 'Invoice marked as paid!', 'success');
