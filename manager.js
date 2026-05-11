@@ -3227,13 +3227,13 @@ async function submitMarkPaid(type) {
     if (amount !== undefined) body.amount = amount;
     const res = await fetch('/api/mark-paid', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
     const resData = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(resData.error || 'Failed');
+    if (!res.ok) throw new Error(resData.error || `Server error ${res.status}`);
     closeMarkPaidModal();
     if (window._mpaidFromPreview) closePreviewModal();
     showToast(type === 'partial' ? 'Partial payment recorded!' : 'Invoice marked as paid!', 'success');
     loadInvoices();
-  } catch {
-    showToast('Failed to record payment.', 'error');
+  } catch (err) {
+    showToast(err.message || 'Failed to record payment.', 'error');
     if (btn) { btn.disabled = false; btn.textContent = type === 'partial' ? 'Record Partial Payment' : 'Confirm Full Payment'; }
   }
 }

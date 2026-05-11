@@ -14,9 +14,11 @@ exports.handler = async (event) => {
   if (!id) return { statusCode: 400, body: JSON.stringify({ error: 'id required' }) };
 
   try {
+    console.log('mark-paid called — id:', id, 'type:', type, 'amount:', amount);
     if (type === 'invoice') {
       const { data: inv, error: selectErr } = await supabase
         .from('invoices').select('total, amount_paid').eq('id', id).maybeSingle();
+      console.log('select result — inv:', JSON.stringify(inv), 'selectErr:', JSON.stringify(selectErr));
 
       if (selectErr) {
         const isMissing = selectErr.message?.includes('amount_paid') || selectErr.message?.includes('column');
