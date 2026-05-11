@@ -352,7 +352,7 @@ function buildInvoiceRow(inv, justPaid) {
   const amtPaid = Number(inv.amount_paid || 0);
   const remaining = (Number(inv.total) - amtPaid).toFixed(2);
   const payBtnHtml = isPaid ? '' : isPartial
-    ? `<span style="font-size:11px;font-weight:600;color:#c2410c;">$${remaining} left</span>`
+    ? `<button onclick="event.stopPropagation();payRemaining('${inv.id}','${esc(clientPasscode)}',${remaining})" class="profile-pay-btn">Pay $${remaining}</button>`
     : (inv.square_payment_link ? `<a href="${esc(inv.square_payment_link)}" class="profile-pay-btn" onclick="event.stopPropagation()" target="_blank">Pay Now</a>` : '');
 
   return `

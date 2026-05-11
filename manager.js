@@ -3129,26 +3129,111 @@ function copyPreviewLink() {
 
 async function markCurrentPaid() {
   if (!_currentPreviewId) return;
-  const label = _currentPreviewType === 'invoice' ? 'invoice' : 'estimate deposit';
-  if (!confirm(`Mark this ${label} as paid?`)) return;
+  if (_currentPreviewType !== 'invoice') {
+    // Estimate deposit — keep original simple confirm flow
+    if (!confirm('Mark this deposit as paid?')) return;
+    const btn = document.getElementById('mark-paid-btn');
+    btn.disabled = true; btn.textContent = 'Saving...';
+    try {
+      const res = await fetch('/api/mark-paid', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: _currentPreviewId, type: 'estimate' }) });
+      if (!res.ok) throw new Error('Failed');
+      showToast('Marked as paid!', 'success');
+      closePreviewModal(); loadInvoices(); loadEstimates();
+    } catch (err) { showToast(err.message, 'error'); btn.disabled = false; btn.textContent = 'Mark as Paid'; }
+    return;
+  }
+  openMarkPaidModal(_currentPreviewId, true);
+}
 
-  const btn = document.getElementById('mark-paid-btn');
-  btn.disabled = true; btn.textContent = 'Saving...';
+function openMarkPaidModal(invId, fromPreview = false) {
+  const inv = invoicesCache.find(i => i.id === invId);
+  if (!inv) return;
+  const total = Number(inv.total).toFixed(2);
+  const amtPaid = Number(inv.amount_paid || 0);
+  const remaining = (Number(inv.total) - amtPaid).toFixed(2);
+  const hasPartial = inv.status === 'partial';
+
+  const overlay = document.createElement('div');
+  overlay.id = 'mpaid-overlay';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:600;display:flex;align-items:center;justify-content:center;padding:16px;';
+  overlay.innerHTML = `
+    <div style="background:#fff;border-radius:16px;width:100%;max-width:400px;box-shadow:0 20px 60px rgba(0,0,0,0.2);" onclick="event.stopPropagation()">
+      <div style="padding:20px 24px 16px;border-bottom:1px solid #f3f4f6;display:flex;justify-content:space-between;align-items:flex-start;">
+        <div>
+          <div style="font-size:17px;font-weight:700;color:#111827;">Record Payment</div>
+          <div style="font-size:13px;color:#6b7280;margin-top:2px;">${esc(inv.invoice_number)} &mdash; $${total} total${hasPartial ? ` &middot; <span style="color:#a16207;font-weight:600;">$${remaining} remaining</span>` : ''}</div>
+        </div>
+        <button onclick="closeMarkPaidModal()" style="background:var(--gray-100);border:none;cursor:pointer;width:30px;height:30px;border-radius:50%;font-size:16px;color:var(--gray-500);display:flex;align-items:center;justify-content:center;">&#x2715;</button>
+      </div>
+      <div style="padding:20px 24px;" id="mpaid-body">
+        <div style="display:flex;gap:10px;">
+          <button onclick="mpaidSelect('full')" class="btn btn-primary" style="flex:1;justify-content:center;">Full Payment</button>
+          <button onclick="mpaidSelect('partial')" class="btn btn-secondary" style="flex:1;justify-content:center;">Partial Payment</button>
+        </div>
+      </div>
+    </div>`;
+  overlay.addEventListener('click', closeMarkPaidModal);
+  document.body.appendChild(overlay);
+  window._mpaidId = invId;
+  window._mpaidFromPreview = fromPreview;
+  window._mpaidRemaining = remaining;
+}
+
+function mpaidSelect(type) {
+  const body = document.getElementById('mpaid-body');
+  if (!body) return;
+  if (type === 'full') {
+    body.innerHTML = `
+      <p style="font-size:14px;color:#374151;margin:0 0 16px;">Mark this invoice as <strong>fully paid</strong>?</p>
+      <button id="mpaid-confirm-btn" onclick="submitMarkPaid('full')" class="btn btn-primary" style="width:100%;justify-content:center;">Confirm Full Payment</button>`;
+  } else {
+    body.innerHTML = `
+      <div style="font-size:14px;color:#374151;margin-bottom:12px;">How much was paid?</div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span style="font-size:16px;color:var(--gray-400);">$</span>
+        <input type="number" id="mpaid-amount" placeholder="0.00" min="0.01" step="0.01"
+          style="flex:1;padding:10px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:16px;">
+      </div>
+      <div id="mpaid-err" style="color:#dc2626;font-size:12px;margin-top:6px;display:none;"></div>
+      <button id="mpaid-confirm-btn" onclick="submitMarkPaid('partial')" class="btn btn-primary" style="width:100%;justify-content:center;margin-top:14px;">Record Partial Payment</button>`;
+    setTimeout(() => document.getElementById('mpaid-amount')?.focus(), 30);
+  }
+}
+
+function closeMarkPaidModal() {
+  document.getElementById('mpaid-overlay')?.remove();
+  window._mpaidId = null;
+}
+
+async function submitMarkPaid(type) {
+  const id = window._mpaidId;
+  if (!id) return;
+  const btn = document.getElementById('mpaid-confirm-btn');
+  const errEl = document.getElementById('mpaid-err');
+
+  let amount;
+  if (type === 'partial') {
+    amount = parseFloat(document.getElementById('mpaid-amount')?.value);
+    if (!amount || amount <= 0) {
+      if (errEl) { errEl.textContent = 'Please enter a valid amount.'; errEl.style.display = ''; }
+      return;
+    }
+  }
+
+  if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
 
   try {
-    const res = await fetch('/api/mark-paid', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: _currentPreviewId, type: _currentPreviewType }),
-    });
-    if (!res.ok) throw new Error('Failed to mark paid');
-    showToast('Marked as paid!', 'success');
-    closePreviewModal();
+    const body = { id, type: 'invoice' };
+    if (amount !== undefined) body.amount = amount;
+    const res = await fetch('/api/mark-paid', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    if (!res.ok) throw new Error('Failed');
+    closeMarkPaidModal();
+    if (window._mpaidFromPreview) closePreviewModal();
+    showToast(type === 'partial' ? 'Partial payment recorded!' : 'Invoice marked as paid!', 'success');
     loadInvoices();
-    loadEstimates();
-  } catch (err) {
-    showToast(err.message, 'error');
-    btn.disabled = false; btn.textContent = 'Mark as Paid';
+  } catch {
+    showToast('Failed to record payment.', 'error');
+    if (btn) { btn.disabled = false; btn.textContent = type === 'partial' ? 'Record Partial Payment' : 'Confirm Full Payment'; }
   }
 }
 
@@ -3176,19 +3261,8 @@ async function undoMarkPaid() {
   }
 }
 
-async function markInvoicePaidFromRow(id) {
-  const inv = invoicesCache.find(i => i.id === id);
-  if (!confirm(`Mark ${inv?.invoice_number || 'invoice'} as paid?`)) return;
-  try {
-    const res = await fetch('/api/mark-paid', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id, type: 'invoice' }),
-    });
-    if (!res.ok) throw new Error('Failed');
-    showToast('Invoice marked as paid!', 'success');
-    loadInvoices();
-  } catch { showToast('Failed to mark paid.', 'error'); }
+function markInvoicePaidFromRow(id) {
+  openMarkPaidModal(id, false);
 }
 
 // ─── Print / Save PDF ──────────────────────────────────────────────────────────

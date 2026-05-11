@@ -57,7 +57,14 @@ exports.handler = async (event) => {
     const squareOrderId = result.paymentLink.orderId;
 
     const existingIds = Array.isArray(invoice.partial_order_ids) ? invoice.partial_order_ids : [];
-    await supabase.from('invoices').update({ partial_order_ids: [...existingIds, squareOrderId] }).eq('id', invoiceId);
+    const { error: updateErr } = await supabase
+      .from('invoices')
+      .update({ partial_order_ids: [...existingIds, squareOrderId] })
+      .eq('id', invoiceId);
+    if (updateErr) {
+      console.error('Failed to store partial order ID — SQL migration may not have been run:', updateErr.message);
+      return { statusCode: 502, body: JSON.stringify({ error: 'DB update failed. Ensure amount_paid and partial_order_ids columns exist.', detail: updateErr.message }) };
+    }
 
     return { statusCode: 200, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ paymentLink, amount: finalAmount }) };
   } catch (err) {
