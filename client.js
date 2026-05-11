@@ -351,9 +351,13 @@ function buildInvoiceRow(inv, justPaid) {
   const dateStr = inv.created_at ? new Date(inv.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '';
   const amtPaid = Number(inv.amount_paid || 0);
   const remaining = (Number(inv.total) - amtPaid).toFixed(2);
-  const payBtnHtml = isPaid ? '' : isPartial
-    ? `<button onclick="event.stopPropagation();payRemaining('${inv.id}','${esc(clientPasscode)}',${remaining})" style="display:inline-block;padding:6px 14px;background:#1a56db;color:#fff;border:none;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;">Pay $${remaining}</button>`
-    : (inv.square_payment_link ? `<a href="${esc(inv.square_payment_link)}" class="profile-pay-btn" onclick="event.stopPropagation()" target="_blank">Pay Now</a>` : '');
+  const payBtnHtml = !isPaid && !isPartial && inv.square_payment_link
+    ? `<a href="${esc(inv.square_payment_link)}" class="profile-pay-btn" onclick="event.stopPropagation()" target="_blank">Pay Now</a>`
+    : '';
+
+  const displayAmount = isPartial
+    ? `<div class="profile-row-amount">$${remaining}</div><div style="font-size:11px;color:#6b7280;margin-top:1px;">of $${Number(inv.total).toFixed(2)} remaining</div>`
+    : `<div class="profile-row-amount">$${Number(inv.total).toFixed(2)}</div>`;
 
   return `
     <div class="profile-row" id="profile-inv-row-${inv.id}">
@@ -363,7 +367,7 @@ function buildInvoiceRow(inv, justPaid) {
           <div class="profile-row-date">${dateStr}</div>
         </div>
         <div class="profile-row-right">
-          <div class="profile-row-amount">$${Number(inv.total).toFixed(2)}</div>
+          ${displayAmount}
           <span class="inv-status-badge ${statusClass}">${statusLabel}</span>
           ${payBtnHtml}
         </div>
