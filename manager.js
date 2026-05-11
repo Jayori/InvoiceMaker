@@ -3161,7 +3161,7 @@ function openMarkPaidModal(invId, fromPreview = false) {
       <div style="padding:20px 24px 16px;border-bottom:1px solid #f3f4f6;display:flex;justify-content:space-between;align-items:flex-start;">
         <div>
           <div style="font-size:17px;font-weight:700;color:#111827;">Record Payment</div>
-          <div style="font-size:13px;color:#6b7280;margin-top:2px;">${esc(inv.invoice_number)} &mdash; $${total} total${hasPartial ? ` &middot; <span style="color:#a16207;font-weight:600;">$${remaining} remaining</span>` : ''}</div>
+          <div style="font-size:13px;color:#6b7280;margin-top:2px;">${esc(inv.invoice_number)} &mdash; $${total} total${hasPartial ? ` &middot; <span style="color:#1e40af;font-weight:600;">$${remaining} remaining</span>` : ''}</div>
         </div>
         <button onclick="closeMarkPaidModal()" style="background:var(--gray-100);border:none;cursor:pointer;width:30px;height:30px;border-radius:50%;font-size:16px;color:var(--gray-500);display:flex;align-items:center;justify-content:center;">&#x2715;</button>
       </div>
@@ -3301,7 +3301,7 @@ function printReceipt() {
     .inv-status-badge { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 12px; font-weight: 600; }
     .inv-status-paid { background: #ecfdf5; color: #059669; }
     .inv-status-pending { background: #fff7ed; color: #c2410c; }
-    .inv-status-partial { background: #fefce8; color: #a16207; }
+    .inv-status-partial { background: #dbeafe; color: #1e40af; }
     .work-date-header { font-size: 11px; font-weight: 700; text-transform: uppercase; color: #6b7280; background: #f9fafb; padding: 6px 10px; }
     .item-type-tag { font-size: 10px; color: #9ca3af; }
     .unpaid-stamp { text-align: center; margin: 20px 0; padding: 12px; border: 3px solid #dc2626; border-radius: 8px; color: #dc2626; font-size: 20px; font-weight: 900; letter-spacing: 0.15em; }
