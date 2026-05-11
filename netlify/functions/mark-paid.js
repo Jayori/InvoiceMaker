@@ -14,10 +14,13 @@ exports.handler = async (event) => {
   if (!id) return { statusCode: 400, body: JSON.stringify({ error: 'id required' }) };
 
   if (type === 'invoice') {
-    const { data: inv } = await supabase.from('invoices').select('total, amount_paid').eq('id', id).maybeSingle();
+    const { data: inv, error: selectErr } = await supabase.from('invoices').select('total, amount_paid').eq('id', id).maybeSingle();
+    if (selectErr) {
+      const missing = selectErr.message?.includes('amount_paid') || selectErr.message?.includes('column');
+      return { statusCode: 502, body: JSON.stringify({ error: missing ? 'DB migration required: run the SQL migration in Supabase to add amount_paid and partial_order_ids columns.' : selectErr.message }) };
+    }
     let update;
     if (amount !== undefined) {
-      // Partial payment recorded manually
       const partialAmt = parseFloat(amount);
       if (isNaN(partialAmt) || partialAmt <= 0) return { statusCode: 400, body: JSON.stringify({ error: 'Invalid amount' }) };
       const currentPaid = parseFloat(inv?.amount_paid) || 0;
@@ -27,11 +30,13 @@ exports.handler = async (event) => {
       update = { amount_paid: newPaid, status: newStatus };
       if (newStatus === 'paid') update.paid_at = new Date().toISOString();
     } else {
-      // Full payment
       update = { status: 'paid', paid_at: new Date().toISOString(), amount_paid: inv?.total || 0 };
     }
     const { error } = await supabase.from('invoices').update(update).eq('id', id);
-    if (error) return { statusCode: 502, body: JSON.stringify({ error: error.message }) };
+    if (error) {
+      const missing = error.message?.includes('amount_paid') || error.message?.includes('column');
+      return { statusCode: 502, body: JSON.stringify({ error: missing ? 'DB migration required: run the SQL migration in Supabase to add amount_paid and partial_order_ids columns.' : error.message }) };
+    }
   } else if (type === 'estimate') {
     const { error } = await supabase
       .from('estimates')
