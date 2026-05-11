@@ -3324,6 +3324,11 @@ function _destroyChart(id) {
   if (_chartInstances[id]) { _chartInstances[id].destroy(); delete _chartInstances[id]; }
 }
 
+// Revenue value for an invoice — partial invoices contribute amount_paid, not total
+function _invRevenue(inv) {
+  return inv.status === 'partial' ? Number(inv.amount_paid || 0) : Number(inv.total || 0);
+}
+
 // Returns paid deposits as invoice-shaped objects for unified revenue calculations
 function _paidDeposits() {
   return estimatesCache
@@ -3342,18 +3347,20 @@ function _fmt$(n) {
 }
 
 function buildMiniWidget() {
-  const allRevenue = [...invoicesCache.filter(i => i.status === 'paid'), ..._paidDeposits()];
+  const allRevenue = [...invoicesCache.filter(i => i.status === 'paid' || i.status === 'partial'), ..._paidDeposits()];
   const now = new Date();
   const paidThisMonth = allRevenue.filter(i => {
     const d = new Date(i.paid_at || i.created_at);
     return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
   });
   const paidThisYear = allRevenue.filter(i => new Date(i.paid_at || i.created_at).getFullYear() === now.getFullYear());
-  const outstanding = invoicesCache.filter(i => i.status === 'pending').reduce((s, i) => s + Number(i.total), 0);
+  const outstanding = invoicesCache
+    .filter(i => i.status === 'pending' || i.status === 'partial')
+    .reduce((s, i) => s + (i.status === 'partial' ? Math.max(0, Number(i.total) - Number(i.amount_paid || 0)) : Number(i.total)), 0);
 
   const setEl = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
-  setEl('mini-stat-month', _fmt$(paidThisMonth.reduce((s, i) => s + Number(i.total), 0)));
-  setEl('mini-stat-year', _fmt$(paidThisYear.reduce((s, i) => s + Number(i.total), 0)));
+  setEl('mini-stat-month', _fmt$(paidThisMonth.reduce((s, i) => s + _invRevenue(i), 0)));
+  setEl('mini-stat-year', _fmt$(paidThisYear.reduce((s, i) => s + _invRevenue(i), 0)));
   setEl('mini-stat-outstanding', _fmt$(outstanding));
 
   const canvas = document.getElementById('mini-revenue-chart');
@@ -3365,7 +3372,7 @@ function buildMiniWidget() {
     data.push(allRevenue.filter(i => {
       const p = new Date(i.paid_at || i.created_at);
       return p.getFullYear() === d.getFullYear() && p.getMonth() === d.getMonth();
-    }).reduce((s, i) => s + Number(i.total), 0));
+    }).reduce((s, i) => s + _invRevenue(i), 0));
   }
   _destroyChart('mini');
   _chartInstances['mini'] = new Chart(canvas, {
@@ -3381,13 +3388,13 @@ function buildMiniWidget() {
 
 function buildAnalytics() {
   if (typeof Chart === 'undefined') return;
-  const paidInvoices = invoicesCache.filter(i => i.status === 'paid');
+  const paidInvoices = invoicesCache.filter(i => i.status === 'paid' || i.status === 'partial');
   const paid = [...paidInvoices, ..._paidDeposits()]; // invoices + deposits
-  const pending = invoicesCache.filter(i => i.status === 'pending');
+  const pending = invoicesCache.filter(i => i.status === 'pending' || i.status === 'partial');
   const now = new Date();
   const yr = now.getFullYear(), mo = now.getMonth();
   const q = Math.floor(mo / 3);
-  const sum = arr => arr.reduce((s, i) => s + Number(i.total), 0);
+  const sum = arr => arr.reduce((s, i) => s + _invRevenue(i), 0);
 
   const paidMo = paid.filter(i => { const d = new Date(i.paid_at || i.created_at); return d.getFullYear() === yr && d.getMonth() === mo; });
   const paidQ  = paid.filter(i => { const d = new Date(i.paid_at || i.created_at); return d.getFullYear() === yr && Math.floor(d.getMonth()/3) === q; });
@@ -3455,7 +3462,7 @@ function setRevenueRange(months) {
 }
 
 function _buildLineChart() {
-  const paid = [...invoicesCache.filter(i => i.status === 'paid'), ..._paidDeposits()];
+  const paid = [...invoicesCache.filter(i => i.status === 'paid' || i.status === 'partial'), ..._paidDeposits()];
   const now = new Date();
   const labels = [], data = [];
   for (let m = _revenueRange - 1; m >= 0; m--) {
@@ -3465,7 +3472,7 @@ function _buildLineChart() {
     data.push(paid.filter(i => {
       const p = new Date(i.paid_at || i.created_at);
       return p.getFullYear() === d.getFullYear() && p.getMonth() === d.getMonth();
-    }).reduce((s, i) => s + Number(i.total), 0));
+    }).reduce((s, i) => s + _invRevenue(i), 0));
   }
   _destroyChart('line');
   const canvas = document.getElementById('analytics-line-chart');
